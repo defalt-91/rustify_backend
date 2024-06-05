@@ -1,7 +1,49 @@
-use std::str::FromStr;
-
+use axum::http::StatusCode;
+use axum::Json;
+use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
-
+use serde_json::json;
+use uuid::Uuid;
+use crate::infra::errors::InfraError;
+use chrono::Utc;
+#[derive(Clone, Debug, PartialEq)]
+pub struct PeerModel {
+    pub id: Uuid,
+    pub title: String,
+    pub body: String,
+    pub published: bool,
+}
+#[derive(Debug)]
+pub enum PeerError {
+    InternalServerError,
+    NotFound(Uuid),
+    InfraError(InfraError),
+}
+impl IntoResponse for PeerError {
+    fn into_response(self) -> axum::response::Response {
+        let (status, err_msg) = match self {
+            Self::NotFound(id) => (
+                StatusCode::NOT_FOUND,
+                format!("PeerModel with id {} has not been found", id),
+            ),
+            Self::InfraError(db_error) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Internal server error: {}", db_error),
+            ),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                String::from("Internal server error"),
+            ),
+        };
+        (
+            status,
+            Json(
+                json!({"resource":"PeerModel", "message": err_msg, "happened_at" :  Utc::now().timestamp() }),
+            ),
+        )
+            .into_response()
+    }
+}
 #[derive(Debug, Deserialize, Serialize, Clone, Hash)]
 pub struct PeerCreate {
     name: String,

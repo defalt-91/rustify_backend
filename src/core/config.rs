@@ -1,76 +1,103 @@
 use std::env;
-use std::net::{Ipv4Addr, SocketAddrV4};
-use std::path::PathBuf;
 
 use axum::http::{HeaderName, HeaderValue, Method};
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS};
-use diesel_async::AsyncPgConnection;
 use jsonwebtoken::Algorithm;
+use tokio::sync::OnceCell;
+use tracing_subscriber::fmt::format;
 
-pub fn base_dir() -> PathBuf { env::current_dir().unwrap() }
-
-pub fn log_level() -> String { env::var("LOG_LEVEL").unwrap() }
-
-pub fn bind() -> SocketAddrV4 {
-    let host: Ipv4Addr = env::var("HOST").unwrap().parse::<Ipv4Addr>().expect("HOST is required");
-    let port: u16 = env::var("PORT").unwrap().parse::<u16>().expect("PORT is required");
-    SocketAddrV4::new(host, port)
+// Define a struct to represent server configuration
+#[derive(Debug)]
+struct ServerConfig {
+    host: String,
+    port: u16,
+    log_level: String,
+    secret: String,
+    allow_origin: Vec<HeaderValue>,
+    jwt_key: String,
+    jwt_algorithm: Algorithm,
+    allow_methods: Vec<Method>,
+    jwt_exp_hours: i64,
+    allow_headers: Vec<HeaderName>,
 }
 
-pub fn secret() -> String {
-    env::var("SECRET").expect("secret is missing!")
+#[derive(Debug)]
+struct DatabaseConfig {
+    db_user: String,
+    db_pass: String,
+    db_host: String,
+    db_name: String,
+    db_port: String,
 }
 
-pub fn jwt_key() -> String {
-    env::var("JWT_KEY").unwrap()
+#[derive(Debug)]
+pub struct Config {
+    server: ServerConfig,
+    db: DatabaseConfig,
 }
 
-pub  fn jwt_algorithm() -> Algorithm {
-    env::var("JWT_ALGORITHM").unwrap().parse().unwrap()
+impl Config {
+    // Getter method for the database URL
+    pub fn db_url(&self) -> String {
+        // format!("postgres://{}:{}@{}:{}/{}", &self.db.db_user, &self.db.db_pass, &self.db.db_host, &self.db.db_port, &self.db.db_name)
+        format!("postgres://{}:{}@/{}", &self.db.db_user, &self.db.db_pass, &self.db.db_name)
+    }
+
+    // Getter method for the server host
+    pub fn bind(&self) -> String {
+        format!("{}:{}", self.server.host, self.server.port)
+    }
+
+    // Getter method for the server port
+    pub fn log_level(&self) -> &str { &self.server.log_level }
+    pub fn secret(&self) -> &str { &self.server.secret }
+    pub fn allow_origin(&self) -> Vec<HeaderValue> { self.server.allow_origin.clone() }
+    pub fn jwt_key(&self) -> &str { self.server.jwt_key.as_str() }
+    pub fn jwt_algorithm(&self) -> Algorithm { self.server.jwt_algorithm }
+    pub fn allow_methods(&self) -> Vec<Method> { self.server.allow_methods.clone() }
+    pub fn jwt_exp_hours(&self) -> i64 { self.server.jwt_exp_hours }
+    pub fn allow_headers(&self) -> Vec<HeaderName> { self.server.allow_headers.clone() }
 }
 
+// Create a static OnceCell to store the application configuration
+pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
 
-pub  fn jwt_exp_secs() -> u64 {
-    env::var("JWT_EXP_SECS").unwrap().parse().unwrap()
-}
+// Asynchronously initialize the configuration
+async fn init_config() -> Config {
+    // Load environment variables from a .env file if present
+    dotenv::dotenv().ok();
+    // Create a ServerConfig instance with default values or values from environment variables
+    let server_config = ServerConfig {
+        host: env::var("HOST").unwrap_or_else(|_| String::from("127.0.0.1")),
+        port: env::var("BACKEND_PORT").unwrap_or_else(|_| String::from("3000")).parse::<u16>().unwrap(),
+        log_level: env::var("LOG_LEVEL").unwrap(),
+        secret: env::var("SECRET").unwrap_or("secret is missing!".to_string()),
+        allow_origin: env::var("ALLOWED_ORIGINS").unwrap_or("[*]".to_string()).split(",").map(|v| v.parse::<HeaderValue>().unwrap()).collect(),
+        jwt_key: env::var("JWT_KEY").unwrap_or("change this".to_string()),
+        jwt_algorithm: env::var("JWT_ALGORITHM").unwrap_or("HS256".to_string()).parse().unwrap(),
+        allow_methods: vec![Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::HEAD, Method::OPTIONS],
+        jwt_exp_hours: env::var("JWT_EXP_Hours").unwrap_or(180.to_string()).parse().unwrap(),
+        allow_headers: vec![AUTHORIZATION, ACCEPT, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS, CONTENT_LENGTH],
+    };
 
-pub fn pg_user() -> String {
-    env::var("DATABASE_USER").unwrap()
-}
+    // Create a DatabaseConfig instance with a required DATABASE_URL environment variable
+    let database_config = DatabaseConfig {
+        db_user: env::var("POSTGRES_USER").expect("POSTGRES_USER must be set"),
+        db_pass: env::var("POSTGRES_PASSWORD").expect("POSTGRES_PASSWORD must be set"),
+        db_host: env::var("PG_HOST").expect("PG_HOST must be set"),
+        db_name: env::var("POSTGRES_DB").expect("POSTGRES_DB must be set"),
+        db_port: env::var("PG_PORT").expect("PG_PORT must be set"),
+    };
 
-pub fn pg_pass() -> String {
-    env::var("DATABASE_PASS").unwrap()
-}
-
-pub fn pg_path() -> String {
-    env::var("DATABASE_PATH").unwrap()
-}
-pub fn pg_db() -> String {
-    env::var("PG_DB").unwrap()
-}
-pub fn pg_url() -> String {
-    let user = pg_user();
-    let pass = pg_pass();
-    let pg_path = pg_path();
-    let pg_db = pg_db();
-    format!("{user}:{pass}//{pg_path}/{pg_db}")
-}
-
-pub fn allow_origin() -> Vec<HeaderValue> {
-    env::var("ALLOWED_ORIGINS").unwrap().split(",").map(|v| v.parse::<HeaderValue>().unwrap()).collect()
-}
-
-pub fn allow_methods() -> [Method; 6] {
-    [
-        Method::GET,
-        Method::POST,
-        Method::PATCH,
-        Method::DELETE,
-        Method::HEAD,
-        Method::OPTIONS,
-    ]
+    // Create a Config instance by combining server and database configurations
+    Config {
+        server: server_config,
+        db: database_config,
+    }
 }
 
-pub fn allow_headers() -> [HeaderName; 5] {
-    [AUTHORIZATION, ACCEPT, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS, CONTENT_LENGTH]
+// Asynchronously retrieve the application configuration, initializing it if necessary
+pub async fn get_config() -> &'static Config {
+    // Get the configuration from the OnceCell or initialize it if it hasn't been set yet
+    CONFIG.get_or_init(init_config).await
 }

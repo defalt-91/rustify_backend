@@ -1,0 +1,133 @@
+services:
+  proxy:
+    container_name: rustify_traefik
+    image: traefik:v3.0
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    restart: always
+    depends_on:
+      - databases
+      - frontend
+      - pgadmin
+    volumes:
+      # Add Docker as a mounted volume, so that Traefik can read the labels of other services
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount the volume to store the certificates
+      - traefik-public-certificates:/certificates
+    command:
+      - --providers.docker
+      - --api.insecure=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.http.address=:80
+      - --providers.docker.constraints=Label(`traefik.constraint-label`, `traefik-public`)
+      - --accesslog
+      - --log
+      - --log.level=DEBUG
+      - --api
+    networks:
+      - traefik-public
+    labels:
+      # Enable Traefik for this service, to make it available in the public network
+      - traefik.enable=true
+      - traefik.constraint-label=traefik-public
+#  backend:
+#    container_name: rustify-backend
+#    image: rustify-backend:latest
+#    volumes:
+#      - .:/app
+#    networks:
+#      - traefik-public
+#      - private
+#    env_file:
+#      - .env
+#    labels:
+#      - traefik.enable=true
+#      - traefik.docker.network=traefik-public
+#      - traefik.constraint-label=traefik-public
+#      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.rule=PathPrefix(`/api`)
+#      - traefik.http.routers.${STACK_NAME?Variable not set}-backend-http.entrypoints=http
+#      - traefik.http.services.${STACK_NAME?Variable not set}-backend.loadbalancer.server.port=3000
+#    entrypoint: ["cargo","run"]
+
+  frontend:
+    container_name: rustify_frontend
+    image: node:20-alpine
+    volumes:
+      - ./wg_frontend:/wg_frontend
+    environment:
+      - PORT=4200
+    command: ["node","/wg_frontend/server/server.mjs"]
+    networks:
+      - traefik-public
+
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.constraint-label=traefik-public
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.rule=PathPrefix(`/`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.entrypoints=http
+      - traefik.http.services.${STACK_NAME?Variable not set}-frontend.loadbalancer.server.port=4200
+
+  databases:
+    container_name: rustify_databases
+#    domainname: db.localhost
+#    hostname: databases
+    image: postgres:14-bullseye
+    volumes:
+      - rustify_db_data:/var/lib/postgresql/data
+    env_file: .env
+    restart: always
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+    networks:
+      - private
+      - traefik-public
+    expose:
+      - "5432"
+    ports:
+      - "5432:5432"
+
+
+  pgadmin:
+    container_name: rustify_pgadmin
+    image: dpage/pgadmin4
+    depends_on:
+      - databases
+    env_file: .env
+    volumes:
+      - pg_admin_data:/var/lib/pgadmin
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.constraint-label=traefik-public
+      - traefik.http.routers.${STACK_NAME?Variable not set}-pgadmin-http.rule=Host(`pgadmin.${DOMAIN?Variable not set}`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-pgadmin-http.entrypoints=http
+      - traefik.http.services.${STACK_NAME?Variable not set}-pgadmin.loadbalancer.server.port=5050
+    networks:
+      - traefik-public
+      - private
+
+#  adminer:
+#    image: adminer
+#    restart: always
+#    ports:
+#      - 8080:8080
+
+networks:
+  traefik-public:
+    external: true
+  private:
+    internal: true
+    external: false
+
+volumes:
+  rustify_db_data:
+  pg_admin_data:
+  traefik-public-certificates:
+#secrets:

@@ -1,23 +1,21 @@
 use axum::{extract::{Request, State}, middleware::Next, response::Response};
-use jsonwebtoken::{decode, DecodingKey, EncodingKey, Validation};
-use serde::{Deserialize, Serialize};
+use deadpool_diesel::postgres::Pool;
+use jsonwebtoken::{DecodingKey, EncodingKey};
 use tower_cookies::{Cookie, Cookies};
-use tracing::{error, info};
+use tracing::{info};
 use tracing::log::debug;
 use uuid::Uuid;
 
-use crate::{ApiResult, schema::ctx::Ctx, Pool, error::Error, error::Result};
-use crate::core::config;
-use crate::core::security::verify_token;
+use crate::{domain::ctx::Ctx, errors::BaseError, errors::Result};
+use crate::core::{get_config,verify_token};
+use crate::errors::ApiResult;
 
 #[derive(Clone)]
-pub struct CtxState {
-    // NOTE: with DB, because a real login would check the DB
-    pub _db: Pool,
+pub struct AppState {
+    pub pool: Pool,
     pub key_enc: EncodingKey,
     pub key_dec: DecodingKey,
 }
-
 
 
 
@@ -32,17 +30,18 @@ pub async fn mw_require_auth(
 }
 
 pub async fn mw_ctx_constructor(
-    State(CtxState { _db, key_dec, .. }): State<CtxState>,
+    State(AppState { key_dec, .. }): State<AppState>,
     cookies: Cookies,
     mut req: Request,
     next: Next,
 ) -> Response {
+    let config =get_config().await;
     info!("->> {:<12} - mw_ctx_constructor", "MIDDLEWARE");
     let uuid = Uuid::new_v4();
-    let result_user_id: Result<String> = extract_token(key_dec, &cookies).map_err(|err| {
+    let result_user_id: Result<String> = extract_token(key_dec, &cookies).await.map_err(|err| {
         // Remove an invalid cookie
-        if let Error::AuthFailJwtInvalid { .. } = err {
-            cookies.remove(Cookie::named(config::jwt_key()))
+        if let BaseError::AuthFailJwtInvalid { .. } = err {
+            cookies.remove(Cookie::named(config.jwt_key()))
         }
         err
     });
@@ -57,11 +56,12 @@ pub async fn mw_ctx_constructor(
 }
 
 
-fn extract_token(key: DecodingKey, cookies: &Cookies) -> Result<String> {
+async fn extract_token(key: DecodingKey, cookies: &Cookies) -> Result<String> {
+    let config = get_config().await;
     cookies
-        .get(config::jwt_key().as_str())
-        .ok_or(Error::AuthFailNoJwtCookie)
-        .and_then(|cookie| verify_token(key, cookie.value()))
+        .get(config.jwt_key())
+        .ok_or(BaseError::AuthFailNoJwtCookie)
+        .and_then(|cookie| verify_token(key,config.jwt_algorithm(), cookie.value()))
 }
 
 #[cfg(test)]
@@ -82,6 +82,7 @@ mod tests {
     fn jwt_sign_expired() {
         let my_claims = Claims {
             exp: 1,
+            iat:chrono::Utc::now().timestamp() as usize,
             auth: SOMEONE.to_string(),
         };
         let token_str = encode(
@@ -123,6 +124,7 @@ mod tests {
         let exp = Utc::now() + Duration::minutes(1);
         let my_claims = Claims {
             exp: exp.timestamp() as usize,
+            iat:chrono::Utc::now().timestamp() as usize,
             auth: SOMEONE.to_string(),
         };
         // Sign

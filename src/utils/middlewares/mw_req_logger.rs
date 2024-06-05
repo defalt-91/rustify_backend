@@ -7,7 +7,8 @@ use axum::{
 use serde::Serialize;
 use serde_json::json;
 
-use crate::{schema::ctx::Ctx, error::Error};
+use crate::{domain::ctx::Ctx, errors::BaseError};
+
 
 #[derive(Serialize, Debug)]
 struct RequestLog {
@@ -25,7 +26,7 @@ pub async fn mw_req_logger(ctx: Ctx, uri: Uri, req_method: Method, res: Response
     let log = RequestLog {
         req_id: ctx.req_id().to_string(),
         user: ctx.user_id().ok(),
-        error: res.extensions().get::<Error>().map(|e| format!("{e:?}")),
+        error: res.extensions().get::<BaseError>().map(|e| format!("{e:?}")),
         req_path: uri.to_string(),
         req_method: req_method.to_string(),
         timestamp: SystemTime::now()

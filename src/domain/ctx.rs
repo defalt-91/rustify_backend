@@ -1,4 +1,4 @@
-use crate::error::*;
+use crate::errors::*;
 use axum::extract::FromRequestParts;
 use uuid::Uuid;
 
@@ -50,7 +50,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Ctx {
             );
             parts.extensions.get::<Ctx>().cloned().ok_or(ApiError {
                 req_id: Uuid::new_v4(),
-                error: Error::AuthFailCtxNotInRequestExt,
+                error: BaseError::AuthFailCtxNotInRequestExt,
             })
         })
     }

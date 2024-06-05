@@ -1,10 +1,12 @@
 use std::process::Output;
+use std::string::FromUtf8Error;
 
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
+use tracing::{info, warn};
 
-use crate::{schema::ctx::Ctx, Pool};
-use crate::error::{ApiError, ApiResult, Error};
+use crate::domain::ctx::Ctx;
+use crate::errors::{ApiError, ApiResult, BaseError};
 
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 // pub struct Peer{
@@ -71,17 +73,23 @@ pub struct PeerRxTxDump {
 }
 
 impl PeerRxTxDump {
-    pub fn from_dump_str(values: (&str, &str)) -> Self {
-        let mut transfer = values.0.split_whitespace();
-        let mut last_handshake = values.1.split_whitespace();
-        // skipping public key
-        last_handshake.next().unwrap();
-        Self {
-            public_key: transfer.next().unwrap().parse().unwrap(),
-            last_handshake_at: last_handshake.next().unwrap().parse().unwrap(),
-            transfer_rx: transfer.next().unwrap().parse().unwrap(),
-            transfer_tx: transfer.next().unwrap().parse().unwrap(),
-        }
+    pub fn from_rxtx_lha(value: (&str, &str)) -> Self {
+        // t_dump.split("\n").zip( lha_dump.split("\n"))
+        //     .map(
+        //         |v| {
+                    let mut transfer = value.0.split_whitespace();
+                    let mut last_handshake = value.1.split_whitespace();
+                    /** skipping dump last-handshake public key */
+                    last_handshake.next().unwrap();
+                    Self {
+                        public_key: transfer.next().unwrap_or("").parse().unwrap(),
+                        last_handshake_at: last_handshake.next().unwrap_or("").parse().unwrap(),
+                        transfer_rx: transfer.next().unwrap_or("").parse().unwrap(),
+                        transfer_tx: transfer.next().unwrap_or("").parse().unwrap(),
+                    }
+            //     }
+            // )
+    //         .collect::<Vec<PeerRxTxDump>>()
     }
 }
 
@@ -94,47 +102,42 @@ pub struct PeerCreate {
     with_psk: bool,
 }
 
-pub struct PeerService<'a> {
-    pub db: &'a Pool,
-    pub ctx: &'a Ctx,
-}
+// pub struct PeerService<'a> {
+//     // pub db: &'a Pool,
+//     pub ctx: &'a Ctx,
+// }
 
-impl<'a> PeerService<'a> {
-    pub async fn sudo_exec(&self, cmd: Vec<&str>) -> ApiResult<Output> {
-        Command::new("sudo")
-            .args(cmd.clone())
-            .output().await.map_err(|err| ApiError {
-            req_id: self.ctx.req_id(),
-            error: Error::Execution { source: "here".to_string() },
-        })
-    }
-    pub async fn peer_full_dump(&self) -> ApiResult<Vec<PeerFullDump>> {
-        let dump_output = self.sudo_exec(vec!["wg", "show", "wg0", "dump"]).await?;
-        let dump = String::from_utf8(dump_output.stdout).unwrap();
-        let dump_str = dump.strip_suffix("\n");
-        let dump_vec: Vec<&str> = dump_str.map_or(vec![], |v| v.split("\n").collect());
-        let mut dump_vec_skipped_if = dump_vec.iter();
-        dump_vec_skipped_if.next();
-        Ok(dump_vec_skipped_if.map(|v| PeerFullDump::from_dump_str(v)).collect())
-    }
+// impl<'a> PeerService<'a> {
+    // pub async fn sudo_exec(&self, cmd: Vec<&str>) -> ApiResult<Output> {
+    //     Command::new("sudo")
+    //         .args(cmd.clone())
+    //         .output().await.map_err(|err| ApiError {
+    //         req_id: self.ctx.req_id(),
+    //         error: Error::Execution { source: "here".to_string() },
+    //     })
+    // }
+    // pub async fn peer_full_dump(&self) -> ApiResult<Vec<PeerFullDump>> {
+    //     let dump_output = self.sudo_exec(vec!["wg", "show", "wg0", "dump"]).await?;
+    //     let dump = String::from_utf8(dump_output.stdout).unwrap();
+    //     let dump_str = dump.strip_suffix("\n");
+    //     let dump_vec: Vec<&str> = dump_str.map_or(vec![], |v| v.split("\n").collect());
+    //     let mut dump_vec_skipped_if = dump_vec.iter();
+    //     dump_vec_skipped_if.next();
+    //     Ok(dump_vec_skipped_if.map(|v| PeerFullDump::from_dump_str(v)).collect())
+    // }
 
-    pub async fn wg_rxtx_lha(&self) -> ApiResult<Vec<PeerRxTxDump>> {
-        let t_output = self.sudo_exec(vec!["wg", "show", "wg0", "transfer"]).await?;
-        let t_dump = String::from_utf8(t_output.stdout).unwrap();
-        let t_dump_str = t_dump.strip_suffix("\n");
-        let lha_output = self.sudo_exec(vec!["wg", "show", "wg0", "latest-handshakes"]).await?;
-        let lha_dump = String::from_utf8(lha_output.stdout).unwrap();
-        let lha_dump_str = lha_dump.strip_suffix("\n");
-
-        Ok(
-            t_dump_str.zip(lha_dump_str).map(
-                |v| v.0.split("\n")
-                    .zip(v.1.split("\n"))
-                    .map(|v| PeerRxTxDump::from_dump_str(v))
-            ).unwrap()
-                .collect::<Vec<PeerRxTxDump>>())
-    }
-}
+    // pub async fn wg_rxtx_lha(&self) -> ApiResult<Vec<PeerRxTxDump>> {
+        // let t_output = self.sudo_exec(vec!["wg", "show", "wg0", "transfer"]).await?;
+        // let lha_output = self.sudo_exec(vec!["wg", "show", "wg0", "latest-handshakes"]).await?;
+        // if !(t_output.stdout.is_empty() && lha_output.stdout.is_empty()) {
+        //     let t_to_string = String::from_utf8(t_output.stdout).unwrap();
+        //     let lha_to_string = String::from_utf8(lha_output.stdout).unwrap();
+        //     let dump_transfer = t_to_string.strip_suffix("\n").unwrap();
+        //     let dump_last_handshake = lha_to_string.strip_suffix("\n").unwrap();
+        //     Ok(PeerRxTxDump::from_rxtx_lha_dump(dump_transfer, dump_last_handshake))
+        // } else { Ok(vec![]) }
+    // }
+// }
 
 
 
