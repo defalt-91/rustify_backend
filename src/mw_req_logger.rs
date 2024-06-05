@@ -1,11 +1,13 @@
-use crate::{ctx::Ctx, error::Error};
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use axum::{
     http::{Method, Uri},
     response::Response,
 };
 use serde::Serialize;
 use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::{schema::ctx::Ctx, error::Error};
 
 #[derive(Serialize, Debug)]
 struct RequestLog {
@@ -32,7 +34,7 @@ pub async fn mw_req_logger(ctx: Ctx, uri: Uri, req_method: Method, res: Response
             .as_millis()
             .to_string(),
     };
-    println!("->> {:<12} - mw_req_logger:", "LOGGER",);
+    println!("->> {:<12} - mw_req_logger:", "LOGGER", );
     println!("{:4}{}\n", "", json!(log));
     res
 }

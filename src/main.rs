@@ -1,94 +1,74 @@
-mod ctx;
+use axum::{
+    middleware,
+    Router,
+    routing::get_service,
+};
+use diesel_async::AsyncPgConnection;
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use dotenv;
+use jsonwebtoken::{DecodingKey, EncodingKey};
+use once_cell::sync::Lazy;
+use tower_cookies::CookieManagerLayer;
+use tower_http::{cors::CorsLayer, services::ServeDir};
+use tracing::{debug, info};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use error::{ApiResult, Result};
+use mw_ctx::CtxState;
+use mw_req_logger::mw_req_logger;
+
+use crate::core::config;
+use crate::api::api_routes;
+
 mod error;
-mod graphql;
 mod mw_ctx;
 mod mw_req_logger;
 mod service;
-mod web;
+mod api;
 mod core;
-mod peer;
-mod utils;
-use async_graphql::{EmptySubscription, Schema};
-use axum::{
-    extract::Extension,
-    middleware,
-    routing::{get, get_service},
-    Router,
-};
-use error::{ApiResult, Result};
-use graphql::{
-    graphiql, graphql_handler, mutation_root::MutationRoot, query_root::QueryRoot, ApiSchema,
-};
-use jsonwebtoken::{DecodingKey, EncodingKey};
-use mw_ctx::CtxState;
-use mw_req_logger::mw_req_logger;
-use once_cell::sync::Lazy;
-use service::ticket_no_db::ModelController;
-use surrealdb::{
-    engine::local::{Db as LocalDb, Mem},
-    Surreal,
-};
-use tower_cookies::CookieManagerLayer;
-use tower_http::services::ServeDir;
-use tracing::info;
-use crate::core::config;
-use dotenv;
-type Db = Surreal<LocalDb>;
-static DB: Lazy<Db> = Lazy::new(Surreal::init);
+mod schema;
+
+type Pool = bb8::Pool<AsyncDieselConnectionManager<AsyncPgConnection>>;
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let env = dotenv::from_path(config::base_dir().join(".env"));
-    println!("-->{:?}",config::base_dir().join(".env"));
-    // no-DB in-memory
-    let mc = ModelController::new().await?;
-    // DB
-    // NOTE: For connection to an existing DB
-    // let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, 8000));
-    // let db = Surreal::new::<Ws>(addr).await?;
-    // NOTE: Also possible to start the DB with ::new without a static ::init
-    // let db: Db = Surreal::new::<Mem>(()).await?;
-    DB.connect::<Mem>(()).await?;
-    println!("->> DB connected in memory");
-    let version = DB.version().await?;
-    println!("->> DB version: {version}");
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_env("LOG_LEVEL").unwrap_or_else(|_| {
+                // axum logs rejections from built-in extractors with the `axum::rejection`
+                // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
+                "example_tracing_aka_logging=debug,tower_http=debug,axum::rejection=trace,example_diesel_async_postgres=debug".into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+    info!("-->{:?}", config::base_dir().join(".env"));
+    // db
+    // NOTE: For connection to an existing db
+    let db_url = config::pg_url();
+        // set up connection pool
+    let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(db_url);
+    let pool = bb8::Pool::builder().build(config).await.unwrap();
+
+    // debug!("->> db version: {pool}");
     // Select a specific namespace / database
-    DB.use_ns("namespace").use_db("database").await?;
-
-    // GQL
-    let schema: ApiSchema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(mc.clone())
-        .data(DB.clone())
-        .finish();
-    let gql = Router::new()
-        .route("/", get(graphiql).post(graphql_handler))
-        .layer(Extension(schema))
-        // Require auth to access gql
-        .route_layer(middleware::from_fn(mw_ctx::mw_require_auth));
-
-    // REST
-    let routes_tickets_no_db = web::routes_tickets_no_db::routes(mc.clone())
-        .route_layer(middleware::from_fn(mw_ctx::mw_require_auth));
-    let routes_tickets = web::routes_tickets::routes(DB.clone())
-        .route_layer(middleware::from_fn(mw_ctx::mw_require_auth));
-
     // Load secret and create secret key for JWT
-    let secret = "some-secret".as_bytes();
-    let key_enc = EncodingKey::from_secret(secret);
-    let key_dec = DecodingKey::from_secret(secret);
+    let key_enc = EncodingKey::from_secret(config::secret().as_bytes());
+    let key_dec = DecodingKey::from_secret(config::secret().as_bytes());
     let ctx_state = CtxState {
-        _db: DB.clone(),
+        _db: pool.clone(),
         key_enc,
         key_dec,
     };
 
     // Main router
     let routes_all = Router::new()
-        .nest("/api/v1",web::routes_login::routes(ctx_state.clone()))
-        .nest("/api/v1",web::routes_peer::peers_routes(ctx_state.clone()))
-        .merge(gql)
-        .nest("/noDb", routes_tickets_no_db)
-        .nest("/api", routes_tickets)
+        .nest(
+            "/api/v1",
+            api_routes(ctx_state.clone(),pool.clone())
+        )
         .layer(middleware::map_response(mw_req_logger))
         // This is where Ctx gets created, with every new request
         .layer(middleware::from_fn_with_state(
@@ -97,11 +77,17 @@ async fn main() -> Result<()> {
         ))
         // Layers are executed from bottom up, so CookieManager has to be under ctx_constructor
         .layer(CookieManagerLayer::new())
+        .layer(
+            CorsLayer::new()
+                .allow_origin(config::allow_origin())
+                .allow_methods(config::allow_methods())
+                .allow_credentials(true)
+                .allow_headers(config::allow_headers())
+        )
         .fallback_service(routes_static());
 
     let listener = tokio::net::TcpListener::bind(config::bind()).await.unwrap();
-    info!("->> LISTENING on {:?}",listener);
-
+    debug!("->> LISTENING on {:?}", config::bind());
     axum::serve(
         listener,
         routes_all.into_make_service(),

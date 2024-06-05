@@ -1,31 +1,32 @@
-use crate::{ctx::Ctx, error::Error, error::Result, ApiResult, Db};
-use axum::{extract::{State,Request},middleware::{self,Next}, response::Response};
+use axum::{extract::{Request, State}, middleware::Next, response::Response};
 use jsonwebtoken::{decode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use tower_cookies::{Cookie, Cookies};
+use tracing::{error, info};
+use tracing::log::debug;
 use uuid::Uuid;
+
+use crate::{ApiResult, schema::ctx::Ctx, Pool, error::Error, error::Result};
+use crate::core::config;
+use crate::core::security::verify_token;
 
 #[derive(Clone)]
 pub struct CtxState {
     // NOTE: with DB, because a real login would check the DB
-    pub _db: Db,
+    pub _db: Pool,
     pub key_enc: EncodingKey,
     pub key_dec: DecodingKey,
 }
 
-pub const JWT_KEY: &str = "jwt";
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub exp: usize,
-    pub auth: String,
-}
+
+
 
 pub async fn mw_require_auth(
     ctx: Ctx,
     req: Request,
-    next: Next
+    next: Next,
 ) -> ApiResult<Response> {
-    println!("->> {:<12} - mw_require_auth - {ctx:?}", "MIDDLEWARE");
+    debug!("->> {:<12} - mw_require_auth - {ctx:?}", "MIDDLEWARE");
     ctx.user_id()?;
     Ok(next.run(req).await)
 }
@@ -36,13 +37,12 @@ pub async fn mw_ctx_constructor(
     mut req: Request,
     next: Next,
 ) -> Response {
-    println!("->> {:<12} - mw_ctx_constructor", "MIDDLEWARE");
-
+    info!("->> {:<12} - mw_ctx_constructor", "MIDDLEWARE");
     let uuid = Uuid::new_v4();
     let result_user_id: Result<String> = extract_token(key_dec, &cookies).map_err(|err| {
         // Remove an invalid cookie
         if let Error::AuthFailJwtInvalid { .. } = err {
-            cookies.remove(Cookie::named(JWT_KEY))
+            cookies.remove(Cookie::named(config::jwt_key()))
         }
         err
     });
@@ -56,25 +56,22 @@ pub async fn mw_ctx_constructor(
     res
 }
 
-fn verify_token(key: DecodingKey, token: &str) -> Result<String> {
-    Ok(decode::<Claims>(token, &key, &Validation::default())?
-        .claims
-        .auth)
-}
+
 fn extract_token(key: DecodingKey, cookies: &Cookies) -> Result<String> {
     cookies
-        .get(JWT_KEY)
+        .get(config::jwt_key().as_str())
         .ok_or(Error::AuthFailNoJwtCookie)
         .and_then(|cookie| verify_token(key, cookie.value()))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::mw_ctx::Claims;
     use chrono::{Duration, Utc};
     use jsonwebtoken::{
-        decode, encode, errors::ErrorKind, DecodingKey, EncodingKey, Header, Validation,
+        decode, DecodingKey, encode, EncodingKey, errors::ErrorKind, Header, Validation,
     };
+
+    use crate::core::security::Claims;
 
     const SECRET: &[u8] = b"some-secret";
     const SOMEONE: &str = "someone";
@@ -92,7 +89,7 @@ mod tests {
             &my_claims,
             &EncodingKey::from_secret(SECRET),
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(token_str, TOKEN_EXPIRED);
     }
 
@@ -105,7 +102,7 @@ mod tests {
             &DecodingKey::from_secret(SECRET),
             &validation,
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(token.claims.auth, SOMEONE);
     }
 
@@ -134,14 +131,14 @@ mod tests {
             &my_claims,
             &EncodingKey::from_secret(SECRET),
         )
-        .unwrap();
+            .unwrap();
         // Verify
         let token_result = decode::<Claims>(
             &token_str,
             &DecodingKey::from_secret(SECRET),
             &Validation::default(),
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(token_result.claims.auth, SOMEONE);
     }
 }

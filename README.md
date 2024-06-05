@@ -1,3 +1,5 @@
+### cargo watch -c -w src -x run
+
 installing Surrealdb
 : curl -sSf https://install.surrealdb.com | sh
 : or
@@ -9,7 +11,7 @@ installing Surrealdb
 
 # Axum server, Async-GraphQl, SurrealDB template
 
-Run without any prior setup, DB is in memory:
+Run without any prior setup, db is in memory:
 
 ```sh
 cargo run

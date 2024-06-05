@@ -1,11 +1,11 @@
-use async_graphql::ErrorExtensions;
+use std::fmt;
+
+use axum::{BoxError, http::{header, HeaderMap, HeaderValue}, http::StatusCode, Json, response::{IntoResponse, Response}};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::fmt;
-use axum::{http::{header, HeaderMap, HeaderValue},http::StatusCode,response::{IntoResponse,Response},Json};
 use uuid::Uuid;
 
-use crate::ctx::Ctx;
+use crate::schema::ctx::Ctx;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ApiError {
@@ -25,6 +25,7 @@ pub enum Error {
     SurrealDb { source: String },
     SurrealDbNoResult { source: String, id: String },
     SurrealDbParse { source: String, id: String },
+    Execution { source: String},
 }
 
 /// ApiError has to have the req_id to report to the client and implements IntoResponse.
@@ -48,6 +49,7 @@ impl ApiError {
 }
 
 const INTERNAL: &str = "Internal error";
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -63,6 +65,7 @@ impl fmt::Display for Error {
             Self::SurrealDb { .. } => write!(f, "{INTERNAL}"),
             Self::SurrealDbNoResult { id, .. } => write!(f, "No result for id {id}"),
             Self::SurrealDbParse { id, .. } => write!(f, "Couldn't parse id {id}"),
+            Self::Execution {..}=>write!(f, "Couldn't execute "),
         }
     }
 }
@@ -76,12 +79,13 @@ impl IntoResponse for ApiError {
             | Error::Serde { .. }
             | Error::SurrealDbNoResult { .. }
             | Error::SurrealDbParse { .. } => StatusCode::BAD_REQUEST,
-            Error::Generic { .. }
+            | Error::Generic { .. }
             | Error::LoginFail
             | Error::AuthFailNoJwtCookie
             | Error::AuthFailJwtInvalid { .. }
             | Error::AuthFailCtxNotInRequestExt
             | Error::SurrealDb { .. } => StatusCode::FORBIDDEN,
+            | Error::Execution {..} => StatusCode::INTERNAL_SERVER_ERROR
         };
         let body = Json(json!({
             "error": {
@@ -96,18 +100,9 @@ impl IntoResponse for ApiError {
     }
 }
 
-// for sending serialized keys through gql extensions
-pub const ERROR_SER_KEY: &str = "error_ser";
 
 // GQL error response
-impl From<ApiError> for async_graphql::Error {
-    fn from(value: ApiError) -> Self {
-        Self::new(value.error.to_string())
-            .extend_with(|_, e| e.set("req_id", value.req_id.to_string()))
-            // storing the original as json in the error extension - for the logger
-            .extend_with(|_, e| e.set(ERROR_SER_KEY, serde_json::to_string(&value.error).unwrap()))
-    }
-}
+
 
 // External Errors
 impl From<serde_json::Error> for Error {
@@ -118,13 +113,13 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<surrealdb::Error> for Error {
-    fn from(value: surrealdb::Error) -> Self {
-        Self::SurrealDb {
-            source: value.to_string(),
-        }
-    }
-}
+// impl From<surrealdb::Error> for Error {
+//     fn from(value: surrealdb::Error) -> Self {
+//         Self::SurrealDb {
+//             source: value.to_string(),
+//         }
+//     }
+// }
 
 impl From<jsonwebtoken::errors::Error> for Error {
     fn from(value: jsonwebtoken::errors::Error) -> Self {
@@ -147,8 +142,6 @@ mod tests {
 }
 
 
-
-
 #[derive(Debug)]
 pub enum UserError {
     NotAuthenticated,
@@ -159,7 +152,7 @@ pub enum UserError {
     AuthorizationHeaderFormatWrong,
     WrongToken,
     UnAuthorizedUser,
-    EmptyHeaderValue
+    EmptyHeaderValue,
 }
 
 fn headers() -> HeaderMap {
@@ -223,5 +216,34 @@ impl IntoResponse for UserError {
             )
         }
             .into_response()
+    }
+}
+
+pub enum PeerErrors {
+    NameIsRequired
+}
+
+impl IntoResponse for PeerErrors {
+    fn into_response(self) -> Response {
+        match self {
+            PeerErrors::NameIsRequired => (
+                StatusCode::BAD_REQUEST,
+                 HeaderMap::new(),
+                "Something went wrong: ",
+            )
+        }.into_response()
+    }
+}
+pub async fn handle_timeout_error(err: BoxError) -> (StatusCode, String) {
+    if err.is::<tower::timeout::error::Elapsed>() {
+        (
+            StatusCode::REQUEST_TIMEOUT,
+            "Request took too long".to_string(),
+        )
+    } else {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Unhandled internal error: {err}"),
+        )
     }
 }

@@ -7,7 +7,7 @@ use std::{
     net::{IpAddr, Ipv4Addr},
 };
 
-static URL: &str = "http://localhost:8800";
+static URL: &str = "http://127.0.0.1:8800";
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Serialize, Deserialize)]
