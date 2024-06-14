@@ -1,11 +1,12 @@
-use std::fmt;
 use deadpool_diesel::InteractError;
+use std::fmt;
 
 // Define a custom error type for infrastructure-related errors
 #[derive(Debug)]
 pub enum InfraError {
     InternalServerError, // Represents an internal server error
     NotFound,            // Represents a resource not found error
+                         // SerializationError,
 }
 
 // Utility function to adapt errors of generic type T into InfraError
@@ -18,6 +19,7 @@ impl fmt::Display for InfraError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             InfraError::NotFound => write!(f, "Not found"), // Display "Not found" for NotFound variant
+            // InfraError::SerializationError => write!(f, "Serialization error"), // Display "Not found" for NotFound variant
             InfraError::InternalServerError => write!(f, "Internal server error"), // Display "Internal server error" for InternalServerError variant
         }
     }
@@ -33,6 +35,7 @@ impl Error for diesel::result::Error {
     fn as_infra_error(&self) -> InfraError {
         match self {
             diesel::result::Error::NotFound => InfraError::NotFound, // Map NotFound to InfraError::NotFound
+            // diesel::result::Error::SerializationError(_err)=>InfraError::SerializationError,
             _ => InfraError::InternalServerError, // Map other errors to InfraError::InternalServerError
         }
     }

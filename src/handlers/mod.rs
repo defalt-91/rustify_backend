@@ -1,13 +1,11 @@
-use axum::{middleware, Router};
-use axum::response::IntoResponse;
 use crate::handlers::auth::auth_router;
 use crate::handlers::peers::{peer_router, peers_router};
-use crate::utils::middlewares::mw_ctx::{AppState, mw_require_auth};
+use crate::utils::middlewares::mw_ctx::{mw_require_auth, AppState};
+use axum::{middleware, Router};
 
-
-mod peers;
 mod auth;
-
+mod peers;
+pub use peers::UpdatePeerRequest;
 // api router
 pub fn api_router(state: AppState) -> Router {
     Router::new()
@@ -16,4 +14,3 @@ pub fn api_router(state: AppState) -> Router {
         .route_layer(middleware::from_fn(mw_require_auth))
         .nest("/auth", auth_router(state.clone()))
 }
-

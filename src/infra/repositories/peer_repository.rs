@@ -1,40 +1,53 @@
-use diesel::{
-    ExpressionMethods, Insertable, PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl,
-    Selectable, SelectableHelper,
-};
+use chrono::NaiveDateTime;
+
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-
 use crate::domain::models::peer::PeerModel;
+use crate::handlers::UpdatePeerRequest;
 use crate::infra::db::schema::peers;
 use crate::infra::errors::{adapt_infra_error, InfraError};
-
 // Define a struct representing the database schema for peers
-#[derive(Serialize, Queryable, Selectable)]
+#[derive(Serialize, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = peers)] // Use the 'peers' table
 #[diesel(check_for_backend(diesel::pg::Pg))] // Check compatibility with PostgreSQL
 pub struct PeerDb {
     pub id: Uuid,
-    pub title: String,
-    pub body: String,
-    pub published: bool,
+    pub name: String,
+    pub enabled: bool,
+    pub persistent_keepalive: i32,
+    pub allowed_ips: String,
+    pub preshared_key: Option<String>,
+    pub private_key: String,
+    pub public_key: String,
+    pub if_pubkey: String,
+    pub address: String,
+    pub transfer_rx: i32,
+    pub transfer_tx: i32,
+    pub last_handshake_at: Option<NaiveDateTime>,
+    pub endpoint_addr: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 // Define a struct for inserting new peers into the database
 #[derive(Deserialize, Insertable)]
 #[diesel(table_name = peers)] // Use the 'peers' table
 pub struct NewPeerDb {
-    pub title: String,
-    pub body: String,
-    pub published: bool,
+    pub name: String,
+    pub preshared_key: Option<String>,
+    pub private_key: String,
+    pub public_key: String,
+    pub if_pubkey: String,
+    pub address: String,
 }
 
 // Define a struct for filtering peers
 #[derive(Deserialize)]
 pub struct PeersFilter {
-    published: Option<bool>,
-    title_contains: Option<String>,
+    enabled: bool,
+    name_contains: Option<String>,
 }
 
 // Function to insert a new peer into the database
@@ -99,12 +112,12 @@ pub async fn get_all(
             let mut query = peers::table.into_boxed::<diesel::pg::Pg>();
 
             // Apply filtering conditions if provided
-            if let Some(published) = filter.published {
-                query = query.filter(peers::published.eq(published));
+            if filter.enabled {
+                query = query.filter(peers::enabled.eq(filter.enabled));
             }
 
-            if let Some(title_contains) = filter.title_contains {
-                query = query.filter(peers::title.ilike(format!("%{}%", title_contains)));
+            if let Some(name_contains) = filter.name_contains {
+                query = query.filter(peers::name.ilike(format!("%{name_contains}%")));
             }
 
             // Select the peers matching the query
@@ -115,20 +128,48 @@ pub async fn get_all(
         .map_err(adapt_infra_error)?;
 
     // Adapt the database representations to the application's domain models
-    let peers: Vec<PeerModel> = res
-        .into_iter()
-        .map(|post_db| adapt_peer_db_to_peer(post_db))
-        .collect();
+    let peers: Vec<PeerModel> = res.into_iter().map(adapt_peer_db_to_peer).collect();
 
     Ok(peers)
+}
+
+pub async fn update_peer(
+    pool: &deadpool_diesel::postgres::Pool,
+    peer_id: Uuid,
+    update_peer: UpdatePeerRequest,
+) -> Result<PeerModel, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let res = conn
+        .interact(move |conn| {
+            diesel::update(peers::table.filter(peers::id.eq(peer_id)))
+                .set(peers::name.eq(update_peer.name))
+                .returning(PeerDb::as_returning())
+                .get_result(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+    Ok(adapt_peer_db_to_peer(res))
 }
 
 // Function to adapt a database representation of a peer to the application's domain model
 fn adapt_peer_db_to_peer(post_db: PeerDb) -> PeerModel {
     PeerModel {
         id: post_db.id,
-        title: post_db.title,
-        body: post_db.body,
-        published: post_db.published,
+        enabled: post_db.enabled,
+        name: post_db.name,
+        allowed_ips: post_db.allowed_ips,
+        persistent_keepalive: post_db.persistent_keepalive as usize,
+        preshared_key: post_db.preshared_key,
+        public_key: post_db.public_key,
+        private_key: post_db.private_key,
+        transfer_tx: post_db.transfer_tx as usize,
+        transfer_rx: post_db.transfer_rx as usize,
+        last_handshake_at: post_db.last_handshake_at,
+        endpoint_addr: post_db.endpoint_addr,
+        address: post_db.address,
+        if_pubkey: post_db.if_pubkey,
+        created_at: post_db.created_at,
+        updated_at: post_db.updated_at,
     }
 }

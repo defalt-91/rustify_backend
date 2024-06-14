@@ -1,0 +1,59 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="PG Admin" type="docker-deploy" factoryName="docker-image" server-name="Docker">
+    <deployment type="docker-image">
+      <settings>
+        <option name="imageTag" value="dpage/pgadmin4" />
+        <option name="containerName" value="pgadmin" />
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_DEFAULT_EMAIL" />
+              <option name="value" value="defalt@myawesomesite.io" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_DEFAULT_PASSWORD" />
+              <option name="value" value="6367411" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_DEFAULT_USER" />
+              <option name="value" value="defalt" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_DEFAULT_USER_PASSWORD" />
+              <option name="value" value="6367411" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_LISTEN_PORT" />
+              <option name="value" value="5050" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION" />
+              <option name="value" value="False" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PGADMIN_CONFIG_CONSOLE_LOG_LEVEL" />
+              <option name="value" value="10" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="portBindings">
+          <list>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="5050" />
+              <option name="hostPort" value="5050" />
+            </DockerPortBindingImpl>
+          </list>
+        </option>
+        <option name="volumeBindings">
+          <list>
+            <DockerVolumeBindingImpl>
+              <option name="containerPath" value="/var/lib/pgadmin" />
+              <option name="hostPath" value="rustify_pgadmin" />
+            </DockerVolumeBindingImpl>
+          </list>
+        </option>
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

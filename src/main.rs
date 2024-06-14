@@ -1,4 +1,4 @@
-use axum::{Router, routing::get_service};
+use axum::Router;
 use deadpool_diesel::postgres::{Manager, Pool};
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use tracing::debug;
@@ -10,24 +10,20 @@ use crate::routes::v1_router;
 use crate::utils::middlewares::mw_ctx::AppState;
 
 // Import modules
-mod errors;
-mod service;
 mod core;
 pub mod domain;
-pub mod infra;
+mod errors;
 mod handlers;
-mod utils;
+pub mod infra;
 mod routes;
-
+mod service;
+mod utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create a connection pool to the PostgresSQL database
     let config = get_config().await;
-    let manager = Manager::new(
-        config.db_url(),
-        deadpool_diesel::Runtime::Tokio1,
-    );
+    let manager = Manager::new(config.db_url(), deadpool_diesel::Runtime::Tokio1);
     let pool = Pool::builder(manager).build().unwrap();
     run_migrations(&pool).await;
     init_tracing();
@@ -37,19 +33,21 @@ async fn main() -> Result<()> {
     let key_dec = DecodingKey::from_secret(config.secret().as_bytes());
 
     // Create an instance of the application state
-    let state = AppState { pool, key_enc, key_dec };
+    let state = AppState {
+        pool,
+        key_enc,
+        key_dec,
+    };
 
-    let app = Router::new().nest(
-        "/api", v1_router(state.clone(), config),
-    );
+    let app = Router::new().nest("/api", v1_router(state.clone(), config));
     let listener = tokio::net::TcpListener::bind(config.bind()).await.unwrap();
     debug!("->> LISTENING on http://{}", config.bind());
     axum::serve(listener, app.into_make_service())
         .await
-        .map_err(internal_error).unwrap();
+        .map_err(internal_error)
+        .unwrap();
     Ok(())
 }
-
 
 // Function to initialize tracing for logging
 fn init_tracing() {

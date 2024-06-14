@@ -1,11 +1,16 @@
 use std::fmt;
 
-use axum::{BoxError, http::{header, HeaderMap, HeaderValue}, http::StatusCode, Json, response::{IntoResponse, Response}};
+use axum::{
+    http::StatusCode,
+    http::{header, HeaderMap, HeaderValue},
+    response::{IntoResponse, Response}, Json,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::domain::ctx::Ctx;
+use crate::domain::models::user::UserError;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ApiError {
@@ -26,7 +31,7 @@ pub enum BaseError {
     SurrealDbParse { source: String, id: String },
     Execution { source: String },
     NotAuthenticated { source: String },
-    UserNotFound { source: String },
+    UserNotFound,
     UserAgentMissing { source: String },
     AuthorizationHeaderMissing { source: String },
     AuthorizationHeaderEmpty { source: String },
@@ -34,9 +39,10 @@ pub enum BaseError {
     WrongToken { source: String },
     UnAuthorizedUser { source: String },
     EmptyHeaderValue { source: String },
-    InternalServerError,        // Represents an internal server error
+    InternalServerError, // Represents an internal server error
     BodyParsingError(String),
     PeerDumpError(&'static str),
+    UserError { source: String },
 }
 
 /// ApiError has to have the req_id to report to the client and implements IntoResponse.
@@ -72,10 +78,8 @@ impl IntoResponse for BaseError {
                 StatusCode::BAD_REQUEST,
                 format!("Bad request error: {}", message),
             ),
-            _ => (
-                StatusCode::BAD_REQUEST,
-                "--> check here".to_string(),
-            )
+            Self::UserError { source } => (StatusCode::UNAUTHORIZED, source),
+            _ => (StatusCode::BAD_REQUEST, "--> check here".to_string()),
         };
 
         // Create a JSON response containing the error message
@@ -100,18 +104,21 @@ impl fmt::Display for BaseError {
             Self::SurrealDbNoResult { id, .. } => write!(f, "No result for id {id}"),
             Self::SurrealDbParse { id, .. } => write!(f, "Couldn't parse id {id}"),
             Self::Execution { .. } => write!(f, "Couldn't execute "),
-            Self::UserNotFound { .. } => write!(f, "No user with provided credentials "),
+            Self::UserNotFound => write!(f, "No user with provided credentials"),
             Self::NotAuthenticated { .. } => write!(f, "You are not authorized"),
             Self::UserAgentMissing { .. } => write!(f, "User-Agent header is missing"),
             Self::AuthorizationHeaderMissing { .. } => write!(f, "Authorization header is missing"),
-            Self::AuthorizationHeaderFormatWrong { .. } => write!(f, "Authorization header format is wrong"),
+            Self::AuthorizationHeaderFormatWrong { .. } => {
+                write!(f, "Authorization header format is wrong")
+            }
             Self::AuthorizationHeaderEmpty { .. } => write!(f, "Empty header is not allowed"),
             Self::WrongToken { .. } => write!(f, "Unable to decode token"),
             Self::UnAuthorizedUser { .. } => write!(f, "You are not an authorized user"),
             Self::EmptyHeaderValue { .. } => write!(f, "Please add the JWT token to the header"),
             Self::InternalServerError => write!(f, "Internal Server Error"),
             Self::BodyParsingError(msg) => write!(f, "Bad request error: {msg}"),
-            Self::PeerDumpError(msg) => write!(f, "{msg}")
+            Self::PeerDumpError(msg) => write!(f, "{msg}"),
+            Self::UserError { source } => write!(f, "Auth error - {source}"),
         }
     }
 }
@@ -121,7 +128,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         println!("->> {:<12} - into_response - {self:?}", "ERROR");
         let status_code = match self.error {
-            | BaseError::Serde { .. }
+            BaseError::Serde { .. }
             | BaseError::SurrealDbNoResult { .. }
             | BaseError::SurrealDbParse { .. } => StatusCode::BAD_REQUEST,
             BaseError::Generic { .. }
@@ -134,15 +141,16 @@ impl IntoResponse for ApiError {
             BaseError::UserNotFound { .. } => StatusCode::NOT_FOUND,
             BaseError::NotAuthenticated { .. } => StatusCode::FORBIDDEN,
             BaseError::UserAgentMissing { .. } => StatusCode::BAD_REQUEST,
-            BaseError::AuthorizationHeaderMissing { .. } => StatusCode::UNAUTHORIZED,
             BaseError::AuthorizationHeaderFormatWrong { .. } => StatusCode::FORBIDDEN,
             BaseError::AuthorizationHeaderEmpty { .. } => StatusCode::FORBIDDEN,
-            BaseError::WrongToken { .. } => StatusCode::UNAUTHORIZED,
-            BaseError::UnAuthorizedUser { .. } => StatusCode::UNAUTHORIZED,
+            BaseError::AuthorizationHeaderMissing { .. }
+            | BaseError::WrongToken { .. }
+            | BaseError::UnAuthorizedUser { .. }
+            | BaseError::UserError { .. } => StatusCode::UNAUTHORIZED,
             BaseError::EmptyHeaderValue { .. } => StatusCode::FORBIDDEN,
             BaseError::InternalServerError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             BaseError::BodyParsingError(..) => StatusCode::BAD_REQUEST,
-            BaseError::PeerDumpError(..) => StatusCode::NOT_FOUND
+            BaseError::PeerDumpError(..) => StatusCode::NOT_FOUND,
         };
         let body = Json(json!({
             "error": {
@@ -157,7 +165,6 @@ impl IntoResponse for ApiError {
     }
 }
 
-
 // External Errors
 impl From<serde_json::Error> for BaseError {
     fn from(value: serde_json::Error) -> Self {
@@ -166,7 +173,6 @@ impl From<serde_json::Error> for BaseError {
         }
     }
 }
-
 // impl From<surrealdb::Error> for Error {
 //     fn from(value: surrealdb::Error) -> Self {
 //         Self::SurrealDb {
@@ -183,6 +189,13 @@ impl From<jsonwebtoken::errors::Error> for BaseError {
     }
 }
 
+impl From<UserError> for BaseError {
+    fn from(value: UserError) -> Self {
+        Self::UserError {
+            source: value.to_string(),
+        }
+    }
+}
 // Define an enumeration for custom application errors
 // #[derive(Debug)]
 // pub enum AppError2 {  // Represents an error related to request body parsing
@@ -192,7 +205,6 @@ impl From<jsonwebtoken::errors::Error> for BaseError {
 pub fn internal_error<E>(_err: E) -> BaseError {
     BaseError::InternalServerError
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -205,7 +217,6 @@ mod tests {
         assert_eq!(err.to_string(), "super description");
     }
 }
-
 
 // #[derive(Debug)]
 // pub enum UserError {
@@ -233,32 +244,32 @@ fn headers() -> HeaderMap {
 //     }
 // }
 
-pub enum PeerErrors {
-    NameIsRequired
-}
+// pub enum PeerErrors {
+//     NameIsRequired
+// }
+//
+// impl IntoResponse for PeerErrors {
+//     fn into_response(self) -> Response {
+//         match self {
+//             PeerErrors::NameIsRequired => (
+//                 StatusCode::BAD_REQUEST,
+//                 HeaderMap::new(),
+//                 "Something went wrong: ",
+//             )
+//         }.into_response()
+//     }
+// }
 
-impl IntoResponse for PeerErrors {
-    fn into_response(self) -> Response {
-        match self {
-            PeerErrors::NameIsRequired => (
-                StatusCode::BAD_REQUEST,
-                HeaderMap::new(),
-                "Something went wrong: ",
-            )
-        }.into_response()
-    }
-}
-
-pub async fn handle_timeout_error(err: BoxError) -> (StatusCode, String) {
-    if err.is::<tower::timeout::error::Elapsed>() {
-        (
-            StatusCode::REQUEST_TIMEOUT,
-            "Request took too long".to_string(),
-        )
-    } else {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Unhandled internal error: {err}"),
-        )
-    }
-}
+// pub async fn handle_timeout_error(err: BoxError) -> (StatusCode, String) {
+//     if err.is::<tower::timeout::error::Elapsed>() {
+//         (
+//             StatusCode::REQUEST_TIMEOUT,
+//             "Request took too long".to_string(),
+//         )
+//     } else {
+//         (
+//             StatusCode::INTERNAL_SERVER_ERROR,
+//             format!("Unhandled internal error: {err}"),
+//         )
+//     }
+// }

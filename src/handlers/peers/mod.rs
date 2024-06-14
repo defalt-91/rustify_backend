@@ -1,18 +1,21 @@
+use axum::routing::{get, patch, post};
 use axum::Router;
-use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::domain::models::peer::PeerModel;
 use create_peer::create_peer;
 use get_peer::get_peer;
+use list_peers::list_peers;
+use update_peer::update_peer;
 use wg_dump::{wg_dump, wg_rxtx_lha};
-use crate::domain::models::peer::PeerModel;
 
 use crate::utils::middlewares::mw_ctx::AppState;
 
-mod get_peer;
 mod create_peer;
+mod get_peer;
 mod list_peers;
+mod update_peer;
 mod wg_dump;
 
 // Define a sub-router for handling peers-related routes
@@ -29,34 +32,39 @@ pub fn peer_router(state: AppState) -> Router {
         // Define a route for creating a new peer using the HTTP POST method
         .route("/", post(create_peer))
         // Define a route for listing peers using the HTTP GET method
-        // .route("/", get(list_peers))
+        .route("/", get(list_peers))
         // Define a route for retrieving a specific peer by ID using the HTTP GET method
         .route("/:id", get(get_peer))
+        .route("/:id", patch(update_peer))
         // Provide the application state to this sub-router
         .with_state(state)
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreatePeerRequest {
-    title: String,
-    body: String,
+    name: String,
 }
-
+#[derive(Debug, Deserialize)]
+pub struct UpdatePeerRequest {
+    pub(crate) name: String,
+}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PeerResponse {
     id: Uuid,
-    title: String,
-    body: String,
-    published: bool,
+    name: String,
+    enabled: bool,
+    created_at: chrono::NaiveDateTime,
+    updated_at: chrono::NaiveDateTime,
 }
 
 impl PeerResponse {
     pub fn from_db(peer: PeerModel) -> Self {
         Self {
             id: peer.id,
-            title: peer.title,
-            body: peer.body,
-            published: peer.published,
+            name: peer.name,
+            enabled: peer.enabled,
+            created_at: peer.created_at,
+            updated_at: peer.updated_at,
         }
     }
 }
@@ -65,11 +73,10 @@ impl PeerResponse {
 pub struct ListPeersResponse {
     peers: Vec<PeerResponse>,
 }
-impl ListPeersResponse{
-    pub fn from_db(peers:Vec<PeerModel>)->Self{
-        Self{
-            peers:peers.into_iter().map(PeerResponse::from_db).collect()
+impl ListPeersResponse {
+    pub fn from_db(peers: Vec<PeerModel>) -> Self {
+        Self {
+            peers: peers.into_iter().map(PeerResponse::from_db).collect(),
         }
     }
 }
-

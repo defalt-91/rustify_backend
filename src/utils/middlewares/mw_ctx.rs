@@ -1,14 +1,18 @@
-use axum::{extract::{Request, State}, middleware::Next, response::Response};
+use axum::{
+    extract::{Request, State},
+    middleware::Next,
+    response::Response,
+};
 use deadpool_diesel::postgres::Pool;
-use jsonwebtoken::{DecodingKey, EncodingKey};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey};
 use tower_cookies::{Cookie, Cookies};
-use tracing::{info};
+use tracing::info;
 use tracing::log::debug;
 use uuid::Uuid;
 
-use crate::{domain::ctx::Ctx, errors::BaseError, errors::Result};
-use crate::core::{get_config,verify_token};
+use crate::core::{get_config, verify_token};
 use crate::errors::ApiResult;
+use crate::{domain::ctx::Ctx, errors::BaseError, errors::Result};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -17,13 +21,7 @@ pub struct AppState {
     pub key_dec: DecodingKey,
 }
 
-
-
-pub async fn mw_require_auth(
-    ctx: Ctx,
-    req: Request,
-    next: Next,
-) -> ApiResult<Response> {
+pub async fn mw_require_auth(ctx: Ctx, req: Request, next: Next) -> ApiResult<Response> {
     debug!("->> {:<12} - mw_require_auth - {ctx:?}", "MIDDLEWARE");
     ctx.user_id()?;
     Ok(next.run(req).await)
@@ -35,40 +33,44 @@ pub async fn mw_ctx_constructor(
     mut req: Request,
     next: Next,
 ) -> Response {
-    let config =get_config().await;
+    let config = get_config().await;
     info!("->> {:<12} - mw_ctx_constructor", "MIDDLEWARE");
     let uuid = Uuid::new_v4();
-    let result_user_id: Result<String> = extract_token(key_dec, &cookies).await.map_err(|err| {
-        // Remove an invalid cookie
-        if let BaseError::AuthFailJwtInvalid { .. } = err {
-            cookies.remove(Cookie::named(config.jwt_key()))
-        }
-        err
-    });
+    let result_user_id: Result<String> =
+        extract_token(config.jwt_key(), config.jwt_algorithm(), key_dec, &cookies)
+            .await
+            .map_err(|error| {
+                // Remove an invalid cookie
+                if let BaseError::AuthFailJwtInvalid { .. } = error {
+                    cookies.remove(Cookie::from(config.jwt_key()))
+                }
+                error
+            });
     // NOTE: DB should be checked here
 
     // Store Ctx in the request extension, for extracting in rest handlers
     let ctx = Ctx::new(result_user_id, uuid);
     req.extensions_mut().insert(ctx);
-
-    let res = next.run(req).await;
-    res
+    next.run(req).await
 }
 
-
-async fn extract_token(key: DecodingKey, cookies: &Cookies) -> Result<String> {
-    let config = get_config().await;
+async fn extract_token(
+    auth_key: &str,
+    alg: Algorithm,
+    dec_key: DecodingKey,
+    cookies: &Cookies,
+) -> Result<String> {
     cookies
-        .get(config.jwt_key())
+        .get(auth_key)
         .ok_or(BaseError::AuthFailNoJwtCookie)
-        .and_then(|cookie| verify_token(key,config.jwt_algorithm(), cookie.value()))
+        .and_then(|cookie| verify_token(dec_key, alg, cookie.value()))
 }
 
 #[cfg(test)]
 mod tests {
     use chrono::{Duration, Utc};
     use jsonwebtoken::{
-        decode, DecodingKey, encode, EncodingKey, errors::ErrorKind, Header, Validation,
+        decode, encode, errors::ErrorKind, DecodingKey, EncodingKey, Header, Validation,
     };
 
     use crate::core::security::Claims;
@@ -76,13 +78,13 @@ mod tests {
     const SECRET: &[u8] = b"some-secret";
     const SOMEONE: &str = "someone";
     // cspell:disable-next-line
-    const TOKEN_EXPIRED: &str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjEsImF1dGgiOiJzb21lb25lIn0.XXHVHu2IsUPA175aQ-noWbQK4Wu-2prk3qTXjwaWBvE";
+    const TOKEN_EXPIRED: &str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjEsImlhdCI6MTcxODM2ODk4OSwiYXV0aCI6InNvbWVvbmUifQ.csXx-tPNZqdrDscUAy4l0dChp5FMqFdEfMexUD2Br_s";
 
     #[test]
     fn jwt_sign_expired() {
         let my_claims = Claims {
             exp: 1,
-            iat:chrono::Utc::now().timestamp() as usize,
+            iat: chrono::Utc::now().timestamp() as usize,
             auth: SOMEONE.to_string(),
         };
         let token_str = encode(
@@ -90,7 +92,7 @@ mod tests {
             &my_claims,
             &EncodingKey::from_secret(SECRET),
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(token_str, TOKEN_EXPIRED);
     }
 
@@ -103,7 +105,7 @@ mod tests {
             &DecodingKey::from_secret(SECRET),
             &validation,
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(token.claims.auth, SOMEONE);
     }
 
@@ -124,7 +126,7 @@ mod tests {
         let exp = Utc::now() + Duration::minutes(1);
         let my_claims = Claims {
             exp: exp.timestamp() as usize,
-            iat:chrono::Utc::now().timestamp() as usize,
+            iat: chrono::Utc::now().timestamp() as usize,
             auth: SOMEONE.to_string(),
         };
         // Sign
@@ -133,14 +135,14 @@ mod tests {
             &my_claims,
             &EncodingKey::from_secret(SECRET),
         )
-            .unwrap();
+        .unwrap();
         // Verify
         let token_result = decode::<Claims>(
             &token_str,
             &DecodingKey::from_secret(SECRET),
             &Validation::default(),
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(token_result.claims.auth, SOMEONE);
     }
 }

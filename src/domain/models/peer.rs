@@ -1,17 +1,29 @@
+use crate::infra::errors::InfraError;
 use axum::http::StatusCode;
-use axum::Json;
 use axum::response::IntoResponse;
+use axum::Json;
+use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
-use crate::infra::errors::InfraError;
-use chrono::Utc;
 #[derive(Clone, Debug, PartialEq)]
 pub struct PeerModel {
     pub id: Uuid,
-    pub title: String,
-    pub body: String,
-    pub published: bool,
+    pub name: String,
+    pub enabled: bool,
+    pub persistent_keepalive: usize,
+    pub allowed_ips: String,
+    pub preshared_key: Option<String>,
+    pub private_key: String,
+    pub public_key: String,
+    pub if_pubkey: String,
+    pub address: String,
+    pub transfer_rx: usize,
+    pub transfer_tx: usize,
+    pub last_handshake_at: Option<NaiveDateTime>,
+    pub endpoint_addr: Option<String>,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 #[derive(Debug)]
 pub enum PeerError {
@@ -53,11 +65,11 @@ pub struct PeerCreate {
 }
 
 impl PeerCreate {
-    pub fn new(name:String,allowed_ips:String,persistent_keepalive:Option<u16>)-> Self{
-        PeerCreate{
-           name,
+    pub fn new(name: String, allowed_ips: String, persistent_keepalive: Option<u16>) -> Self {
+        PeerCreate {
+            name,
             allowed_ips,
-            persistent_keepalive
+            persistent_keepalive,
         }
     }
 }

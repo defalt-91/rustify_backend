@@ -1,10 +1,11 @@
 use std::env;
 
+use axum::http::header::{
+    ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS,
+};
 use axum::http::{HeaderName, HeaderValue, Method};
-use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS};
 use jsonwebtoken::Algorithm;
 use tokio::sync::OnceCell;
-use tracing_subscriber::fmt::format;
 
 // Define a struct to represent server configuration
 #[derive(Debug)]
@@ -39,8 +40,15 @@ pub struct Config {
 impl Config {
     // Getter method for the database URL
     pub fn db_url(&self) -> String {
-        // format!("postgres://{}:{}@{}:{}/{}", &self.db.db_user, &self.db.db_pass, &self.db.db_host, &self.db.db_port, &self.db.db_name)
-        format!("postgres://{}:{}@/{}", &self.db.db_user, &self.db.db_pass, &self.db.db_name)
+        format!(
+            "postgres://{}:{}@{}:{}/{}",
+            &self.db.db_user,
+            &self.db.db_pass,
+            &self.db.db_host,
+            &self.db.db_port,
+            &self.db.db_name
+        )
+        // format!("postgres://{}:{}@/{}", &self.db.db_user, &self.db.db_pass, &self.db.db_name)
     }
 
     // Getter method for the server host
@@ -49,14 +57,30 @@ impl Config {
     }
 
     // Getter method for the server port
-    pub fn log_level(&self) -> &str { &self.server.log_level }
-    pub fn secret(&self) -> &str { &self.server.secret }
-    pub fn allow_origin(&self) -> Vec<HeaderValue> { self.server.allow_origin.clone() }
-    pub fn jwt_key(&self) -> &str { self.server.jwt_key.as_str() }
-    pub fn jwt_algorithm(&self) -> Algorithm { self.server.jwt_algorithm }
-    pub fn allow_methods(&self) -> Vec<Method> { self.server.allow_methods.clone() }
-    pub fn jwt_exp_hours(&self) -> i64 { self.server.jwt_exp_hours }
-    pub fn allow_headers(&self) -> Vec<HeaderName> { self.server.allow_headers.clone() }
+    pub fn log_level(&self) -> &str {
+        &self.server.log_level
+    }
+    pub fn secret(&self) -> &str {
+        &self.server.secret
+    }
+    pub fn allow_origin(&self) -> Vec<HeaderValue> {
+        self.server.allow_origin.clone()
+    }
+    pub fn jwt_key(&self) -> &str {
+        self.server.jwt_key.as_str()
+    }
+    pub fn jwt_algorithm(&self) -> Algorithm {
+        self.server.jwt_algorithm
+    }
+    pub fn allow_methods(&self) -> Vec<Method> {
+        self.server.allow_methods.clone()
+    }
+    pub fn jwt_exp_hours(&self) -> i64 {
+        self.server.jwt_exp_hours
+    }
+    pub fn allow_headers(&self) -> Vec<HeaderName> {
+        self.server.allow_headers.clone()
+    }
 }
 
 // Create a static OnceCell to store the application configuration
@@ -69,15 +93,41 @@ async fn init_config() -> Config {
     // Create a ServerConfig instance with default values or values from environment variables
     let server_config = ServerConfig {
         host: env::var("HOST").unwrap_or_else(|_| String::from("127.0.0.1")),
-        port: env::var("BACKEND_PORT").unwrap_or_else(|_| String::from("3000")).parse::<u16>().unwrap(),
+        port: env::var("BACKEND_PORT")
+            .unwrap_or_else(|_| String::from("3000"))
+            .parse::<u16>()
+            .unwrap(),
         log_level: env::var("LOG_LEVEL").unwrap(),
         secret: env::var("SECRET").unwrap_or("secret is missing!".to_string()),
-        allow_origin: env::var("ALLOWED_ORIGINS").unwrap_or("[*]".to_string()).split(",").map(|v| v.parse::<HeaderValue>().unwrap()).collect(),
+        allow_origin: env::var("ALLOWED_ORIGINS")
+            .unwrap_or("[*]".to_string())
+            .split(",")
+            .map(|v| v.parse::<HeaderValue>().unwrap())
+            .collect(),
         jwt_key: env::var("JWT_KEY").unwrap_or("change this".to_string()),
-        jwt_algorithm: env::var("JWT_ALGORITHM").unwrap_or("HS256".to_string()).parse().unwrap(),
-        allow_methods: vec![Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::HEAD, Method::OPTIONS],
-        jwt_exp_hours: env::var("JWT_EXP_Hours").unwrap_or(180.to_string()).parse().unwrap(),
-        allow_headers: vec![AUTHORIZATION, ACCEPT, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS, CONTENT_LENGTH],
+        jwt_algorithm: env::var("JWT_ALGORITHM")
+            .unwrap_or("HS256".to_string())
+            .parse()
+            .unwrap(),
+        allow_methods: vec![
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::HEAD,
+            Method::OPTIONS,
+        ],
+        jwt_exp_hours: env::var("JWT_EXP_Hours")
+            .unwrap_or(180.to_string())
+            .parse()
+            .unwrap(),
+        allow_headers: vec![
+            AUTHORIZATION,
+            ACCEPT,
+            CONTENT_TYPE,
+            X_CONTENT_TYPE_OPTIONS,
+            CONTENT_LENGTH,
+        ],
     };
 
     // Create a DatabaseConfig instance with a required DATABASE_URL environment variable

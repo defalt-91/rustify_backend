@@ -257,6 +257,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-targets 0.52.5",
 ]
@@ -400,6 +401,7 @@ checksum = "35b696af9ff4c0d2a507db2c5faafa8aa0205e297e5f11e203a24226d5355e7a"
 dependencies = [
  "bitflags 2.5.0",
  "byteorder",
+ "chrono",
  "diesel_derives",
  "itoa",
  "pq-sys",

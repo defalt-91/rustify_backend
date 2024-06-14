@@ -1,7 +1,6 @@
 use deadpool_diesel::postgres::Pool;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
 // Function to run database migrations
 pub async fn run_migrations(pool: &Pool) {

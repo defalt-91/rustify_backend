@@ -9,7 +9,7 @@ description = "A restful webapp for wg crud operations"
 [dependencies]
 axum = { version = "0.7.5", features = ["multipart"] }
 bcrypt = "0.15.1"
-chrono = "0.4.38"
+chrono = { version = "0.4.38", features = ["serde"] }
 dotenv = "0.15.0"
 jsonwebtoken = "9.3.0"
 once_cell = "1.19.0"
@@ -23,7 +23,7 @@ tower-http = { version = "0.5.2", features = ["fs", "cors", "trace"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.8.0", features = ["fast-rng", "v4", "serde"] }
-diesel = { version = "2.2.0", features = ["postgres", "uuid", "serde_json"] }
+diesel = { version = "2.2.0", features = ["postgres", "uuid", "serde_json", "chrono"] }
 diesel_migrations = "2"
 deadpool-diesel = { version = "0.6.1", features = ["postgres"] }
 axum-macros = "0.4.1"

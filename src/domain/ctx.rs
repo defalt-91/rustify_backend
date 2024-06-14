@@ -1,5 +1,6 @@
 use crate::errors::*;
 use axum::extract::FromRequestParts;
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -44,7 +45,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Ctx {
         Self: 'async_trait,
     {
         Box::pin(async {
-            println!(
+            debug!(
                 "->> {:<12} - Ctx::from_request_parts - extract Ctx from extension",
                 "EXTRACTOR"
             );
