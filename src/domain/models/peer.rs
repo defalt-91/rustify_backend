@@ -1,8 +1,11 @@
+use std::fmt;
+use std::fmt::Formatter;
 use crate::infra::errors::InfraError;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use chrono::{NaiveDateTime, Utc};
+use diesel::Identifiable;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -24,12 +27,23 @@ pub struct PeerModel {
     pub endpoint_addr: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub interface_id:i32,
 }
+
 #[derive(Debug)]
 pub enum PeerError {
     InternalServerError,
     NotFound(Uuid),
     InfraError(InfraError),
+}
+impl fmt::Display for PeerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            PeerError::InternalServerError => write!(f, "InternalServerError"),
+            PeerError::NotFound(uuid) => write!(f, "user with userid : {uuid} not found"),
+            PeerError::InfraError(_err) => write!(f, "infra error"),
+        }
+    }
 }
 impl IntoResponse for PeerError {
     fn into_response(self) -> axum::response::Response {
@@ -56,6 +70,7 @@ impl IntoResponse for PeerError {
             .into_response()
     }
 }
+
 #[derive(Debug, Deserialize, Serialize, Clone, Hash)]
 pub struct PeerCreate {
     name: String,
@@ -73,6 +88,7 @@ impl PeerCreate {
         }
     }
 }
+
 // #[derive(Debug, Deserialize, Serialize, Clone, Hash)]
 // pub struct PeerFullDump {
 //     name:Option<String>,

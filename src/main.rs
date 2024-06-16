@@ -1,7 +1,8 @@
+#![feature(duration_constructors)]
+
 use axum::Router;
 use deadpool_diesel::postgres::{Manager, Pool};
 use jsonwebtoken::{DecodingKey, EncodingKey};
-use tracing::debug;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::core::{get_config, run_migrations};
@@ -41,7 +42,7 @@ async fn main() -> Result<()> {
 
     let app = Router::new().nest("/api", v1_router(state.clone(), config));
     let listener = tokio::net::TcpListener::bind(config.bind()).await.unwrap();
-    debug!("->> LISTENING on http://{}", config.bind());
+    tracing::info!("->> LISTENING on http://{}", config.bind());
     axum::serve(listener, app.into_make_service())
         .await
         .map_err(internal_error)

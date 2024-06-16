@@ -10,7 +10,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::domain::ctx::Ctx;
+use crate::domain::models::peer::PeerError;
 use crate::domain::models::user::UserError;
+use crate::infra::errors::InfraError;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ApiError {
@@ -26,23 +28,24 @@ pub enum BaseError {
     AuthFailJwtInvalid { source: String },
     AuthFailCtxNotInRequestExt,
     Serde { source: String },
-    SurrealDb { source: String },
-    SurrealDbNoResult { source: String, id: String },
-    SurrealDbParse { source: String, id: String },
+    // SurrealDb { source: String },
+    // SurrealDbNoResult { source: String, id: String },
+    // SurrealDbParse { source: String, id: String },
     Execution { source: String },
     NotAuthenticated { source: String },
     UserNotFound,
-    UserAgentMissing { source: String },
-    AuthorizationHeaderMissing { source: String },
-    AuthorizationHeaderEmpty { source: String },
-    AuthorizationHeaderFormatWrong { source: String },
-    WrongToken { source: String },
-    UnAuthorizedUser { source: String },
-    EmptyHeaderValue { source: String },
+    // UserAgentMissing { source: String },
+    // AuthorizationHeaderMissing { source: String },
+    // AuthorizationHeaderEmpty { source: String },
+    // AuthorizationHeaderFormatWrong { source: String },
+    // WrongToken { source: String },
+    // UnAuthorizedUser { source: String },
+    // EmptyHeaderValue { source: String },
     InternalServerError, // Represents an internal server error
     BodyParsingError(String),
     PeerDumpError(&'static str),
     UserError { source: String },
+    PeerError { source: String },
 }
 
 /// ApiError has to have the req_id to report to the client and implements IntoResponse.
@@ -53,7 +56,7 @@ pub type Result<T> = core::result::Result<T, BaseError>;
 
 impl std::error::Error for BaseError {}
 // We don't implement Error for ApiError, because it doesn't implement Display.
-// Implementing Display for it triggers a generic impl From ApiError for gql-Error on async-graphql - and we want to implement it ourselves, to always include extensions on Errors. It would create conflicting implementations.
+// Implementing Display for it triggers a generic impl From ApiError- and we want to implement it ourselves, to always include extensions on Errors. It would create conflicting implementations.
 
 // for slightly less verbose error mappings
 impl ApiError {
@@ -72,7 +75,7 @@ impl IntoResponse for BaseError {
         let (status, err_msg) = match self {
             Self::InternalServerError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                String::from("Internal Server Error"),
+                "Internal Server Error".into(),
             ),
             Self::BodyParsingError(message) => (
                 StatusCode::BAD_REQUEST,
@@ -100,25 +103,26 @@ impl fmt::Display for BaseError {
             }
             Self::Serde { source } => write!(f, "Serde error - {source}"),
             Self::AuthFailCtxNotInRequestExt => write!(f, "{INTERNAL}"),
-            Self::SurrealDb { .. } => write!(f, "{INTERNAL}"),
-            Self::SurrealDbNoResult { id, .. } => write!(f, "No result for id {id}"),
-            Self::SurrealDbParse { id, .. } => write!(f, "Couldn't parse id {id}"),
+            // Self::SurrealDb { .. } => write!(f, "{INTERNAL}"),
+            // Self::SurrealDbNoResult { id, .. } => write!(f, "No result for id {id}"),
+            // Self::SurrealDbParse { id, .. } => write!(f, "Couldn't parse id {id}"),
             Self::Execution { .. } => write!(f, "Couldn't execute "),
             Self::UserNotFound => write!(f, "No user with provided credentials"),
             Self::NotAuthenticated { .. } => write!(f, "You are not authorized"),
-            Self::UserAgentMissing { .. } => write!(f, "User-Agent header is missing"),
-            Self::AuthorizationHeaderMissing { .. } => write!(f, "Authorization header is missing"),
-            Self::AuthorizationHeaderFormatWrong { .. } => {
-                write!(f, "Authorization header format is wrong")
-            }
-            Self::AuthorizationHeaderEmpty { .. } => write!(f, "Empty header is not allowed"),
-            Self::WrongToken { .. } => write!(f, "Unable to decode token"),
-            Self::UnAuthorizedUser { .. } => write!(f, "You are not an authorized user"),
-            Self::EmptyHeaderValue { .. } => write!(f, "Please add the JWT token to the header"),
+            // Self::UserAgentMissing { .. } => write!(f, "User-Agent header is missing"),
+            // Self::AuthorizationHeaderMissing { .. } => write!(f, "Authorization header is missing"),
+            // Self::AuthorizationHeaderFormatWrong { .. } => {
+            //     write!(f, "Authorization header format is wrong")
+            // }
+            // Self::AuthorizationHeaderEmpty { .. } => write!(f, "Empty header is not allowed"),
+            // Self::WrongToken { .. } => write!(f, "Unable to decode token"),
+            // Self::UnAuthorizedUser { .. } => write!(f, "You are not an authorized user"),
+            // Self::EmptyHeaderValue { .. } => write!(f, "Please add the JWT token to the header"),
             Self::InternalServerError => write!(f, "Internal Server Error"),
-            Self::BodyParsingError(msg) => write!(f, "Bad request error: {msg}"),
+            Self::BodyParsingError(msg) => write!(f, "{msg}"),
             Self::PeerDumpError(msg) => write!(f, "{msg}"),
-            Self::UserError { source } => write!(f, "Auth error - {source}"),
+            Self::UserError { source } => write!(f, "Auth Model - {source}"),
+            Self::PeerError { source } => write!(f, "Peer Model - {source}")
         }
     }
 }
@@ -129,28 +133,29 @@ impl IntoResponse for ApiError {
         println!("->> {:<12} - into_response - {self:?}", "ERROR");
         let status_code = match self.error {
             BaseError::Serde { .. }
-            | BaseError::SurrealDbNoResult { .. }
-            | BaseError::SurrealDbParse { .. } => StatusCode::BAD_REQUEST,
+            // | BaseError::SurrealDbNoResult { .. }
+            // | BaseError::UserAgentMissing { .. }
+            | BaseError::BodyParsingError(..)
+            // | BaseError::SurrealDbParse { .. },
+            | BaseError::PeerError { .. } => StatusCode::BAD_REQUEST,
             BaseError::Generic { .. }
             | BaseError::LoginFail
             | BaseError::AuthFailNoJwtCookie
             | BaseError::AuthFailJwtInvalid { .. }
             | BaseError::AuthFailCtxNotInRequestExt
-            | BaseError::SurrealDb { .. } => StatusCode::FORBIDDEN,
-            BaseError::Execution { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            BaseError::UserNotFound { .. } => StatusCode::NOT_FOUND,
-            BaseError::NotAuthenticated { .. } => StatusCode::FORBIDDEN,
-            BaseError::UserAgentMissing { .. } => StatusCode::BAD_REQUEST,
-            BaseError::AuthorizationHeaderFormatWrong { .. } => StatusCode::FORBIDDEN,
-            BaseError::AuthorizationHeaderEmpty { .. } => StatusCode::FORBIDDEN,
-            BaseError::AuthorizationHeaderMissing { .. }
-            | BaseError::WrongToken { .. }
-            | BaseError::UnAuthorizedUser { .. }
+            // | BaseError::SurrealDb { .. }
+            // | BaseError::AuthorizationHeaderEmpty { .. }
+            // | BaseError::EmptyHeaderValue { .. }
+            | BaseError::NotAuthenticated { .. }
+            // | BaseError::AuthorizationHeaderFormatWrong { .. } ,
             | BaseError::UserError { .. } => StatusCode::UNAUTHORIZED,
-            BaseError::EmptyHeaderValue { .. } => StatusCode::FORBIDDEN,
-            BaseError::InternalServerError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            BaseError::BodyParsingError(..) => StatusCode::BAD_REQUEST,
-            BaseError::PeerDumpError(..) => StatusCode::NOT_FOUND,
+            BaseError::Execution { .. }
+            | BaseError::InternalServerError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            // BaseError::AuthorizationHeaderMissing { .. }
+            // | BaseError::WrongToken { .. }
+            // | BaseError::UnAuthorizedUser { .. }
+            BaseError::PeerDumpError(..)
+            | BaseError::UserNotFound { .. } => StatusCode::NOT_FOUND,
         };
         let body = Json(json!({
             "error": {
@@ -173,13 +178,14 @@ impl From<serde_json::Error> for BaseError {
         }
     }
 }
-// impl From<surrealdb::Error> for Error {
-//     fn from(value: surrealdb::Error) -> Self {
-//         Self::SurrealDb {
-//             source: value.to_string(),
-//         }
-//     }
-// }
+
+impl From<InfraError> for BaseError {
+    fn from(value: InfraError) -> Self {
+        Self::PeerError {
+            source: value.to_string(),
+        }
+    }
+}
 
 impl From<jsonwebtoken::errors::Error> for BaseError {
     fn from(value: jsonwebtoken::errors::Error) -> Self {
@@ -196,44 +202,63 @@ impl From<UserError> for BaseError {
         }
     }
 }
+
+impl From<PeerError> for BaseError {
+    fn from(value: PeerError) -> Self {
+        // match value {
+            // PeerError::InternalServerError => Self::PeerError {
+            //     source: value.to_string(),
+            // },
+            // PeerError::NotFound(err) => Self::PeerError {
+            //     source: err.to_string(),
+            // },
+            // PeerError::InfraError(err) => Self::PeerError {
+            //     source: err.to_string(),
+            // }
+            // // }
+            Self::PeerError {
+                source: value.to_string(),
+            }
+        }
+    }
 // Define an enumeration for custom application errors
 // #[derive(Debug)]
 // pub enum AppError2 {  // Represents an error related to request body parsing
 // }
 
-// Define a util to create an internal server error
-pub fn internal_error<E>(_err: E) -> BaseError {
-    BaseError::InternalServerError
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn display_description() {
-        let err = super::BaseError::Generic {
-            description: "super description".to_owned(),
-        };
-        assert_eq!(format!("{err}"), "super description");
-        assert_eq!(err.to_string(), "super description");
+    // Define a util to create an internal server error
+    pub fn internal_error<E>(_err: E) -> BaseError {
+        BaseError::InternalServerError
     }
-}
+
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn display_description() {
+            let err = super::BaseError::Generic {
+                description: "super description".to_owned(),
+            };
+            assert_eq!(format!("{err}"), "super description");
+            assert_eq!(err.to_string(), "super description");
+        }
+    }
 
 // #[derive(Debug)]
 // pub enum UserError {
 // }
 
-fn headers() -> HeaderMap {
-    return HeaderMap::from_iter(vec![
-        // (header::ACCEPT_RANGES,HeaderValue::from_static("bytes")),
-        //  (header::CONTENT_LENGTH,HeaderValue::from_str(format!("is").as_str()).unwrap()),
-        // (header::CONTENT_RANGE,HeaderValue::from_str("asdf").unwrap()),
-        //(header::TRANSFER_ENCODING,"trailers".to_string()),
-        (
-            header::WWW_AUTHENTICATE,
-            HeaderValue::from_str("Bearer").unwrap(),
-        ),
-    ]);
-}
+    fn headers() -> HeaderMap {
+        return HeaderMap::from_iter(vec![
+            // (header::ACCEPT_RANGES,HeaderValue::from_static("bytes")),
+            //  (header::CONTENT_LENGTH,HeaderValue::from_str(format!("is").as_str()).unwrap()),
+            // (header::CONTENT_RANGE,HeaderValue::from_str("asdf").unwrap()),
+            //(header::TRANSFER_ENCODING,"trailers".to_string()),
+            (
+                header::WWW_AUTHENTICATE,
+                HeaderValue::from_str("Bearer").unwrap(),
+            ),
+        ]);
+    }
 
 // impl IntoResponse for UserError {
 //     fn into_response(self) -> Response {

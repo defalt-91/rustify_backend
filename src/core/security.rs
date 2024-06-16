@@ -19,7 +19,7 @@ pub struct Claims {
 pub async fn create_token(auth: String, key_enc: EncodingKey) -> String {
     let jwt_duration = get_config().await.jwt_exp_hours();
     let iat = Utc::now();
-    let exp = iat + Duration::from_secs(jwt_duration as u64);
+    let exp = iat + Duration::from_mins(jwt_duration as u64);
     let claims = Claims {
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,

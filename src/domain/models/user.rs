@@ -2,7 +2,7 @@ use crate::infra::errors::InfraError;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use serde_json::json;
 use std::fmt;
 use std::fmt::Formatter;
@@ -13,7 +13,8 @@ pub struct UserModel {
     pub id: Uuid,
     pub username: String,
     pub hashed_password: String,
-    // pub active: bool,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Debug)]

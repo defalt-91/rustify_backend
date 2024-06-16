@@ -117,7 +117,7 @@ async fn init_config() -> Config {
             Method::HEAD,
             Method::OPTIONS,
         ],
-        jwt_exp_hours: env::var("JWT_EXP_Hours")
+        jwt_exp_hours: env::var("JWT_EXP_MINUTES")
             .unwrap_or(180.to_string())
             .parse()
             .unwrap(),

@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use crate::domain::models::user::UserModel;
 use crate::infra::db::schema::users;
 use crate::infra::errors::{adapt_infra_error, InfraError};
@@ -11,10 +12,12 @@ use uuid::Uuid;
 #[derive(Serialize, Queryable, Selectable)]
 #[diesel(table_name = users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct UserDb {
+pub struct User {
     pub id: Uuid,
     pub username: String,
     pub hashed_password: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Deserialize, Insertable)]
@@ -31,7 +34,7 @@ pub async fn create(pool: &Pool, new_user: NewUserDb) -> Result<UserModel, Infra
         .interact(|conn| {
             diesel::insert_into(users::table)
                 .values(new_user)
-                .returning(UserDb::as_returning())
+                .returning(User::as_returning())
                 .get_result(conn)
         })
         .await
@@ -47,7 +50,7 @@ pub async fn read(pool: &Pool, id: Uuid) -> Result<UserModel, InfraError> {
         .interact(move |conn| {
             users::table
                 .filter(users::id.eq(id))
-                .select(UserDb::as_select())
+                .select(User::as_select())
                 .get_result(conn)
         })
         .await
@@ -65,7 +68,7 @@ pub async fn read_by_username(pool: &Pool, username: String) -> Result<UserModel
         .interact(move |conn| {
             users::table
                 .filter(users::username.eq(&username))
-                .select(UserDb::as_select())
+                .select(User::as_select())
                 .get_result(conn)
         })
         .await
@@ -77,10 +80,12 @@ pub async fn read_by_username(pool: &Pool, username: String) -> Result<UserModel
 }
 
 // Function to adapt a database representation of a user to the application's domain model
-fn adapt_user_db_to_user(db_user: UserDb) -> UserModel {
+fn adapt_user_db_to_user(db_user: User) -> UserModel {
     UserModel {
         id: db_user.id,
         username: db_user.username,
         hashed_password: db_user.hashed_password,
+        created_at:db_user.created_at,
+        updated_at:db_user.updated_at,
     }
 }

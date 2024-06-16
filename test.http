@@ -1,45 +1,52 @@
-### GET request to example server
-POST http://localhost:3000/api/v1/auth/login/access-token
-Content-Type: application/x-www-form-urlencoded
-
-username = defalt4 &
-password = 6367411
-
 ### Register user
 POST http://localhost:3000/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "username": "defaslts4",
+  "username": "defalt2",
   "password": "6367411"
 }
 
+###  login
+POST http://localhost:3000/api/v1/auth/login/access-token
+Content-Type: application/x-www-form-urlencoded
+
+username = defalt2 &
+password = 6367411
+
 ###  peers rxtx
 GET http://localhost:3000/api/v1/peers/rxtx
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTgzNjM0MjQsImlhdCI6MTcxODM2MzI0NCwiYXV0aCI6ImRlZmFsdDQifQ.yjJNFYUqKqfm-QC1RkCFdOtFBtbiNzRF5GZo98Q2DCs
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
 
 
 ### create peer
 POST http://localhost:3000/api/v1/peer
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTgzNTg4NDYsImlhdCI6MTcxODM1ODY2NiwiYXV0aCI6ImRlZmFsdCJ9.riaeLpWtcg7pQ3xF1IfT4uAse_sHaOpKI528EzXrAXY
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
 
 {
-  "name": "test peer2",
+  "name": "new peer",
   "enabled": "false"
 }
 
 ### list peer
 GET http://localhost:3000/api/v1/peer?enabled=true&name_contains=
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTgzNTg4NDYsImlhdCI6MTcxODM1ODY2NiwiYXV0aCI6ImRlZmFsdCJ9.riaeLpWtcg7pQ3xF1IfT4uAse_sHaOpKI528EzXrAXY
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
 
 
 ### update peer
-PATCH http://localhost:3000/api/v1/peer/30ed0ced-d68e-42b0-8b15-5c9d6626d3d8
+PATCH http://localhost:3000/api/v1/peer/ffb88d2f-f578-45bf-914a-70f7d82f7d25
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTgzNTg4NDYsImlhdCI6MTcxODM1ODY2NiwiYXV0aCI6ImRlZmFsdCJ9.riaeLpWtcg7pQ3xF1IfT4uAse_sHaOpKI528EzXrAXY
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
 
 {
-  "name": "updated name1"
+  "name": "updated peer",
+  "interface_id": 1
 }
+
+### delete peer
+DELETE http://localhost:3000/api/v1/peer/ffb88d2f-f578-45bf-914a-70f7d82f7d25
+Content-Type: application/json
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
+
