@@ -1,3 +1,4 @@
+use std::ops::Add;
 use crate::core::{create_token, get_config, verify_password};
 use crate::domain::ctx::Ctx;
 use crate::domain::models::user::UserError;
@@ -9,10 +10,7 @@ use axum::{extract::State, Json};
 use axum_extra::extract::Form;
 use serde::{Deserialize, Serialize};
 use tower_cookies::{
-    cookie::{
-        time::{ext::NumericalDuration, OffsetDateTime},
-        SameSite,
-    },
+    cookie::{time::{Duration, OffsetDateTime}, SameSite,Expiration},
     Cookie, Cookies,
 };
 use tracing::debug;
@@ -67,14 +65,18 @@ pub async fn auth_login(
             req_id: ctx.req_id(),
         });
     };
-    let token_str = create_token(db_user.username, key_enc).await;
+    let token_str = create_token(db_user.id,db_user.username, key_enc).await;
+    let config = get_config().await;
+    let duration = Duration::minutes(config.jwt_exp_minutes());
+    let cookie_exp = Expiration::from(OffsetDateTime::now_utc().checked_add(duration));
     cookies.add(
-        Cookie::build((get_config().await.jwt_key(), token_str.clone()))
+        Cookie::build(Cookie::new(config.jwt_key(), token_str.clone()))
             // if not set, the path defaults to the path from which it was called - prohibiting gql on root if login is on /api
             .path("/")
             // .domain("127.0.0.1")
             .same_site(SameSite::Strict)
-            .expires(OffsetDateTime::now_utc().checked_add(7.minutes()))
+            .expires(cookie_exp)
+                // OffsetDateTime::now_utc().checked_add(Duration::hours(2)))
             .http_only(false)
             .secure(false)
             .build(),

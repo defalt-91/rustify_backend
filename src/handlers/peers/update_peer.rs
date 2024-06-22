@@ -1,6 +1,6 @@
 use crate::domain::models::peer::PeerError;
 use crate::handlers::peers::{PeerResponse, UpdatePeerRequest};
-use crate::infra::errors::{adapt_infra_error, InfraError};
+use crate::infra::errors::InfraError;
 use crate::infra::peer_repository;
 use crate::utils::middlewares::mw_ctx::AppState;
 use crate::utils::{JsonExtractor, PathExtractor};
@@ -23,7 +23,7 @@ pub async fn update_peer(
     };
     peer_repository::update_peer(&state.pool, id, update_values)
         .await
-        .map(|updated_peer|PeerResponse::from_db(updated_peer))
+        .map(PeerResponse::from_db)
         .map(Json)
         .map_err(|db_error| match db_error {
             // Map infrastructure errors to custom PeerError types

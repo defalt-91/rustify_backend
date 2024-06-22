@@ -18,8 +18,10 @@ struct ServerConfig {
     jwt_key: String,
     jwt_algorithm: Algorithm,
     allow_methods: Vec<Method>,
-    jwt_exp_hours: i64,
+    jwt_exp_minutes: i64,
     allow_headers: Vec<HeaderName>,
+    hash_cost:u32,
+    timeout_secs:u64,
 }
 
 #[derive(Debug)]
@@ -55,6 +57,8 @@ impl Config {
     pub fn bind(&self) -> String {
         format!("{}:{}", self.server.host, self.server.port)
     }
+    pub fn hash_cost(&self) -> u32 { self.server.hash_cost }
+    pub fn timeout_secs(&self) -> u64 { self.server.timeout_secs }
 
     // Getter method for the server port
     pub fn log_level(&self) -> &str {
@@ -75,9 +79,7 @@ impl Config {
     pub fn allow_methods(&self) -> Vec<Method> {
         self.server.allow_methods.clone()
     }
-    pub fn jwt_exp_hours(&self) -> i64 {
-        self.server.jwt_exp_hours
-    }
+    pub fn jwt_exp_minutes(&self) -> i64 { self.server.jwt_exp_minutes }
     pub fn allow_headers(&self) -> Vec<HeaderName> {
         self.server.allow_headers.clone()
     }
@@ -99,6 +101,8 @@ async fn init_config() -> Config {
             .unwrap(),
         log_level: env::var("LOG_LEVEL").unwrap(),
         secret: env::var("SECRET").unwrap_or("secret is missing!".to_string()),
+        hash_cost:env::var("HASH_COST").expect("HASH_COST must be set ").parse().unwrap(),
+        timeout_secs:env::var("APP_REQUEST_TIMEOUT_SECONDS").expect("APP_REQUEST_TIMEOUT_SECONDS must be set ").parse().unwrap(),
         allow_origin: env::var("ALLOWED_ORIGINS")
             .unwrap_or("[*]".to_string())
             .split(",")
@@ -117,7 +121,7 @@ async fn init_config() -> Config {
             Method::HEAD,
             Method::OPTIONS,
         ],
-        jwt_exp_hours: env::var("JWT_EXP_MINUTES")
+        jwt_exp_minutes: env::var("JWT_EXP_MINUTES")
             .unwrap_or(180.to_string())
             .parse()
             .unwrap(),

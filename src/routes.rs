@@ -1,14 +1,10 @@
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::{middleware, Router};
+use std::time::Duration;
+use axum::{middleware, Router, routing::get, response::IntoResponse, http::StatusCode};
 use tower_cookies::CookieManagerLayer;
-use tower_http::cors::CorsLayer;
-
+use tower_http::{timeout::TimeoutLayer, cors::CorsLayer};
 use crate::core::Config;
 use crate::handlers::api_router;
-use crate::utils::middlewares::mw_ctx::{mw_ctx_constructor, AppState};
-use crate::utils::middlewares::mw_req_logger::mw_req_logger;
+use crate::utils::middlewares::{mw_req_logger::mw_req_logger, mw_ctx::{mw_ctx_constructor, AppState}};
 
 pub fn v1_router(state: AppState, config: &'static Config) -> Router {
     Router::new()
@@ -22,13 +18,8 @@ pub fn v1_router(state: AppState, config: &'static Config) -> Router {
         ))
         // Layers are executed from bottom up, so CookieManager has to be under ctx_constructor
         .layer(CookieManagerLayer::new())
-        .layer(
-            CorsLayer::new()
-                .allow_origin(config.allow_origin())
-                .allow_methods(config.allow_methods())
-                .allow_credentials(true)
-                .allow_headers(config.allow_headers()),
-        )
+        .layer(create_cors(config))
+        .layer(TimeoutLayer::new(Duration::from_secs(10)))
         .fallback(handler_404)
     // .fallback_service(routes_static())
 }
@@ -45,4 +36,12 @@ async fn handler_404() -> impl IntoResponse {
         StatusCode::NOT_FOUND,
         "The requested resource was not found",
     )
+}
+
+fn create_cors(config: &Config) -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(config.allow_origin())
+        .allow_methods(config.allow_methods())
+        .allow_credentials(true)
+        .allow_headers(config.allow_headers())
 }

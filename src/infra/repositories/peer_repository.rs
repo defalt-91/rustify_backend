@@ -5,6 +5,7 @@ use serde::{Deserialize};
 use uuid::Uuid;
 
 use crate::domain::models::peer::PeerModel;
+use crate::handlers::PeersFilter;
 use crate::infra::db::schema::peers;
 use crate::infra::db::schema::peers::{id, updated_at};
 use crate::infra::errors::{adapt_infra_error, InfraError};
@@ -54,12 +55,6 @@ pub struct UpdatePeerForm {
     pub interface_id: Option<i32>,
 }
 
-// Define a struct for filtering peers
-#[derive(Deserialize)]
-pub struct PeersFilter {
-    enabled: bool,
-    name_contains: Option<String>,
-}
 
 // Function to insert a new peer into the database
 pub async fn create(

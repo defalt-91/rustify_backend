@@ -4,7 +4,6 @@ use axum::Json;
 use crate::domain::ctx::Ctx;
 
 // Import internal modules and types
-use crate::domain::models::peer::PeerError;
 use crate::errors::{ApiError, ApiResult};
 use crate::handlers::peers::{CreatePeerRequest, PeerResponse};
 use crate::infra::peer_repository;

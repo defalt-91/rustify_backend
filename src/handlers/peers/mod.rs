@@ -13,13 +13,14 @@ mod list_peers;
 mod update_peer;
 mod wg_dump;
 mod remove_peer;
-
 // Define a sub-router for handling peers-related routes
 pub fn peers_router(state: AppState) -> Router {
     // Create a new Router for peers-related routes
     Router::new()
-        .route("/", get(wg_dump::wg_dump))
+        .route("/dump", get(wg_dump::wg_dump))
+        // Define a route for listing peers using the HTTP GET method
         .route("/rxtx", get(wg_dump::wg_rxtx_lha))
+        .route("/", get(list_peers::list_peers))
         .with_state(state)
 }
 
@@ -28,14 +29,19 @@ pub fn peer_router(state: AppState) -> Router {
     Router::new()
         // Define a route for creating a new peer using the HTTP POST method
         .route("/", post(create_peer::create_peer))
-        // Define a route for listing peers using the HTTP GET method
-        .route("/", get(list_peers::list_peers))
         // Define a route for retrieving a specific peer by ID using the HTTP GET method
         .route("/:id", get(get_peer::get_peer))
         .route("/:id", patch(update_peer::update_peer))
         .route("/:id", delete(remove_peer::delete_peer))
         // Provide the application state to this sub-router
         .with_state(state)
+}
+
+// Define a struct for filtering peers
+#[derive(Deserialize)]
+pub struct PeersFilter {
+    pub enabled: bool,
+    pub name_contains: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

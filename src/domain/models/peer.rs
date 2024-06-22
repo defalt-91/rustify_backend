@@ -5,7 +5,6 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use chrono::{NaiveDateTime, Utc};
-use diesel::Identifiable;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;

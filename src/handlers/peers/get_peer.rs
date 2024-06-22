@@ -19,15 +19,13 @@ pub async fn get_peer(
     PathExtractor(peer_id): PathExtractor<Uuid>, // Extract the peer_id from the request path
 ) -> Result<Json<PeerResponse>, PeerError> {
     // Use the peer_repository to fetch the peer based on its ID
-    let peer =
-        peer_repository::read(&state.pool, peer_id)
-            .await
-            .map_err(|db_error| match db_error {
-                // Map infrastructure errors to custom PeerError types
-                InfraError::InternalServerError => PeerError::InternalServerError,
-                InfraError::NotFound => PeerError::NotFound(peer_id),
-            })?;
-
-    // Convert the retrieved PeerModel to a PeerResponse
-    Ok(Json(PeerResponse::from_db(peer)))
+    peer_repository::read(&state.pool, peer_id)
+        .await
+        .map(PeerResponse::from_db)
+        .map(Json)
+        .map_err(|db_error| match db_error {
+            // Map infrastructure errors to custom PeerError types
+            InfraError::InternalServerError => PeerError::InternalServerError,
+            InfraError::NotFound => PeerError::NotFound(peer_id),
+        })
 }

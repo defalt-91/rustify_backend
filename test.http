@@ -3,50 +3,54 @@ POST http://localhost:3000/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "username": "defalt2",
-  "password": "6367411"
+  "username": "deflt12",
+  "password": "636741163674116367411636741163674116367411636741163674116367411636741163674116367411"
 }
 
 ###  login
 POST http://localhost:3000/api/v1/auth/login/access-token
 Content-Type: application/x-www-form-urlencoded
 
-username = defalt2 &
-password = 6367411
-
-###  peers rxtx
-GET http://localhost:3000/api/v1/peers/rxtx
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
-
+username = deflt12 &
+password = 636741163674116367411636741163674116367411636741163674116367411636741163674116367411
 
 ### create peer
 POST http://localhost:3000/api/v1/peer
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc
 
 {
   "name": "new peer",
   "enabled": "false"
 }
 
-### list peer
-GET http://localhost:3000/api/v1/peer?enabled=true&name_contains=
+### read peer
+GET http://localhost:3000/api/v1/peer/64eea571-274f-48c7-b083-bc0733b58e39
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
-
-
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc
 ### update peer
-PATCH http://localhost:3000/api/v1/peer/ffb88d2f-f578-45bf-914a-70f7d82f7d25
+PATCH http://localhost:3000/api/v1/peer/64eea571-274f-48c7-b083-bc0733b58e39
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
-
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc
 {
   "name": "updated peer",
   "interface_id": 1
 }
 
 ### delete peer
-DELETE http://localhost:3000/api/v1/peer/ffb88d2f-f578-45bf-914a-70f7d82f7d25
+DELETE http://localhost:3000/api/v1/peer/64eea571-274f-48c7-b083-bc0733b58e39
 Content-Type: application/json
-Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3MTg1NDc0MTgsImlhdCI6MTcxODUzNjYxOCwiYXV0aCI6ImRlZmFsdDIifQ.czinM5fcaoRURfrNc4j9Aln1BZhSO2qvxnWnL4AJjcc
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc
 
+###  peers rxtx
+GET http://localhost:3000/api/v1/peers/rxtx
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc
+
+###  peers full dump
+GET http://localhost:3000/api/v1/peers/dump
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc
+
+### list peers
+GET http://localhost:3000/api/v1/peers?enabled=true&name_contains=
+Content-Type: application/json
+Cookie: jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YmQ0NTExNi0xOGQyLTQwNmMtOTMxOC0wYzBmYTE3MDJlNjkiLCJuYW1lIjoiZGVmYWx0MTEiLCJleHAiOjE3MTkwOTA5OTAsImlhdCI6MTcxOTA4MDE5MH0.obT6XXjZSLgw-NN5k8XIOlF1lfoDDxFGpGnSzgezbDc

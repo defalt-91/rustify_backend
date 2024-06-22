@@ -5,7 +5,7 @@ use axum::{middleware, Router};
 
 mod auth;
 mod peers;
-pub use peers::UpdatePeerRequest;
+pub use peers::PeersFilter;
 // api router
 pub fn api_router(state: AppState) -> Router {
     Router::new()

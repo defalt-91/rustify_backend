@@ -4,7 +4,6 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 use crate::domain::ctx::Ctx;
 use crate::errors::{ApiError, ApiResult};
-use crate::handlers::peers::PeerResponse;
 use crate::infra::peer_repository::{remove_peer};
 use crate::utils::middlewares::mw_ctx::AppState;
 use crate::utils::PathExtractor;

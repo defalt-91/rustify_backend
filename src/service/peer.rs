@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 // pub struct Peer{
 //     name:Option<String>,
@@ -40,25 +39,25 @@ impl PeerFullDump {
         Self {
             name: Some("test".to_string()),
             public_key: values.next().unwrap().to_string(),
-            preshared_key: values.next().map_or(None, |v| {
+            preshared_key: values.next().and_then(|v| {
                 if v == "(none)" {
                     None
                 } else {
                     Some(v.to_string())
                 }
             }),
-            endpoint_addr: values.next().map_or(None, |v| {
+            endpoint_addr: values.next().and_then(|v| {
                 if v == "(none)" {
                     None
                 } else {
                     Some(v.to_string())
                 }
             }),
-            allowed_ips: values.next().map_or(None, |v| Some(v.to_string())),
+            allowed_ips: values.next().map(|v| v.to_string()),
             last_handshake_at: values.next().unwrap().parse().unwrap(),
             transfer_rx: values.next().unwrap().parse().unwrap(),
             transfer_tx: values.next().unwrap().parse().unwrap(),
-            persistent_keepalive: values.next().map_or(None, |v| Some(v.parse().unwrap())),
+            persistent_keepalive: values.next().map(|v| v.parse().unwrap()),
         }
     }
 }

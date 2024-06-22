@@ -3,6 +3,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
+use axum::extract::FromRef;
 use deadpool_diesel::postgres::Pool;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey};
 use tower_cookies::{Cookie, Cookies};
@@ -13,6 +14,7 @@ use uuid::Uuid;
 use crate::core::{get_config, verify_token};
 use crate::errors::ApiResult;
 use crate::{domain::ctx::Ctx, errors::BaseError, errors::Result};
+// use crate::utils::ExtractJwt;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -20,14 +22,26 @@ pub struct AppState {
     pub key_enc: EncodingKey,
     pub key_dec: DecodingKey,
 }
-
-pub async fn mw_require_auth(ctx: Ctx, req: Request, next: Next) -> ApiResult<Response> {
+impl FromRef<AppState> for EncodingKey{
+    fn from_ref(input: &AppState) -> Self {
+       input.key_enc.clone()
+    }
+}
+impl FromRef<AppState> for DecodingKey{
+    fn from_ref(input: &AppState) -> Self {
+       input.key_dec.clone()
+    }
+}
+pub async fn mw_require_auth(
+    ctx: Ctx,
+    req: Request, next: Next) -> ApiResult<Response> {
     debug!("->> {:<12} - mw_require_auth - {ctx:?}", "MIDDLEWARE");
     ctx.user_id()?;
     Ok(next.run(req).await)
 }
 
 pub async fn mw_ctx_constructor(
+    // ExtractJwt(token):ExtractJwt,
     State(AppState { key_dec, .. }): State<AppState>,
     cookies: Cookies,
     mut req: Request,
@@ -85,7 +99,8 @@ mod tests {
         let my_claims = Claims {
             exp: 1,
             iat: chrono::Utc::now().timestamp() as usize,
-            auth: SOMEONE.to_string(),
+            name: SOMEONE.to_string(),
+            sub:uuid::Uuid::new_v4()
         };
         let token_str = encode(
             &Header::default(),
@@ -106,7 +121,7 @@ mod tests {
             &validation,
         )
         .unwrap();
-        assert_eq!(token.claims.auth, SOMEONE);
+        assert_eq!(token.claims.name, SOMEONE);
     }
 
     #[test]
@@ -127,7 +142,8 @@ mod tests {
         let my_claims = Claims {
             exp: exp.timestamp() as usize,
             iat: chrono::Utc::now().timestamp() as usize,
-            auth: SOMEONE.to_string(),
+            name: SOMEONE.to_string(),
+            sub:uuid::Uuid::new_v4()
         };
         // Sign
         let token_str = encode(
@@ -143,6 +159,6 @@ mod tests {
             &Validation::default(),
         )
         .unwrap();
-        assert_eq!(token_result.claims.auth, SOMEONE);
+        assert_eq!(token_result.claims.name, SOMEONE);
     }
 }

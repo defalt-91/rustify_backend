@@ -1,14 +1,14 @@
 mod custom_extractors;
 pub mod middlewares;
 
-use crate::domain::ctx::Ctx;
-use crate::errors::{ApiError, Result, BaseError};
+use crate::errors::{Result, BaseError};
 pub use custom_extractors::json_extractor::JsonExtractor;
 pub use custom_extractors::path_extractor::PathExtractor;
+// pub use custom_extractors::cookie_extractor::ExtractJwt;
 use std::process::Output;
 use tokio::process::Command;
 
-pub async fn sudo_exec(ctx: &Ctx, cmd: Vec<&str>) -> Result<Output> {
+pub async fn sudo_exec(cmd: Vec<&str>) -> Result<Output> {
     Command::new("sudo")
         .args(cmd.clone())
         .output()

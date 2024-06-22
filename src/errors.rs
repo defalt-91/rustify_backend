@@ -34,6 +34,7 @@ pub enum BaseError {
     Execution { source: String },
     NotAuthenticated { source: String },
     UserNotFound,
+    UserAgentMissing,
     // UserAgentMissing { source: String },
     // AuthorizationHeaderMissing { source: String },
     // AuthorizationHeaderEmpty { source: String },
@@ -82,6 +83,7 @@ impl IntoResponse for BaseError {
                 format!("Bad request error: {}", message),
             ),
             Self::UserError { source } => (StatusCode::UNAUTHORIZED, source),
+            Self::AuthFailNoJwtCookie=>(StatusCode::UNAUTHORIZED,"You are not logged in".to_string()),
             _ => (StatusCode::BAD_REQUEST, "--> check here".to_string()),
         };
 
@@ -118,6 +120,7 @@ impl fmt::Display for BaseError {
             // Self::WrongToken { .. } => write!(f, "Unable to decode token"),
             // Self::UnAuthorizedUser { .. } => write!(f, "You are not an authorized user"),
             // Self::EmptyHeaderValue { .. } => write!(f, "Please add the JWT token to the header"),
+            Self::UserAgentMissing => write!(f,"User-Agent header is missing"),
             Self::InternalServerError => write!(f, "Internal Server Error"),
             Self::BodyParsingError(msg) => write!(f, "{msg}"),
             Self::PeerDumpError(msg) => write!(f, "{msg}"),
@@ -156,6 +159,7 @@ impl IntoResponse for ApiError {
             // | BaseError::UnAuthorizedUser { .. }
             BaseError::PeerDumpError(..)
             | BaseError::UserNotFound { .. } => StatusCode::NOT_FOUND,
+            BaseError::UserAgentMissing => StatusCode::BAD_REQUEST,
         };
         let body = Json(json!({
             "error": {
@@ -248,7 +252,7 @@ impl From<PeerError> for BaseError {
 // }
 
     fn headers() -> HeaderMap {
-        return HeaderMap::from_iter(vec![
+        HeaderMap::from_iter(vec![
             // (header::ACCEPT_RANGES,HeaderValue::from_static("bytes")),
             //  (header::CONTENT_LENGTH,HeaderValue::from_str(format!("is").as_str()).unwrap()),
             // (header::CONTENT_RANGE,HeaderValue::from_str("asdf").unwrap()),
@@ -257,7 +261,7 @@ impl From<PeerError> for BaseError {
                 header::WWW_AUTHENTICATE,
                 HeaderValue::from_str("Bearer").unwrap(),
             ),
-        ]);
+        ])
     }
 
 // impl IntoResponse for UserError {

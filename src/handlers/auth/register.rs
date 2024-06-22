@@ -15,12 +15,15 @@ pub async fn register(
     JsonExtractor(payload): JsonExtractor<RegisterUserRequest>,
 ) -> Result<Json<UserResponse>, UserError> {
     debug!("{:?}", payload.clone());
-    if let Some(_value) = read_by_username(&pool, payload.username.clone()).await.ok() {
+    if let Ok(_value) = read_by_username(&pool, payload.username.clone()).await {
         return Err(UserError::UsernameExists);
     }
     let new_user = user_repository::NewUserDb {
         username: payload.username,
-        hashed_password: hash_password(&payload.password).unwrap().to_string(),
+        hashed_password: hash_password(&payload.password)
+            .await
+            .unwrap()
+            .to_string()
     };
     let db_user = user_repository::create(&pool, new_user)
         .await
