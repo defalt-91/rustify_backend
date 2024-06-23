@@ -1,10 +1,14 @@
 use deadpool_diesel::postgres::Pool;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use crate::errors::internal_error;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
 // Function to run database migrations
 pub async fn run_migrations(pool: &Pool) {
-    let conn = pool.get().await.unwrap();
+    let conn = pool
+        .get()
+        .await
+        .unwrap();
     conn.interact(|conn| conn.run_pending_migrations(MIGRATIONS).map(|_| ()))
         .await
         .unwrap()

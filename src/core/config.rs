@@ -90,8 +90,8 @@ pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
 
 // Asynchronously initialize the configuration
 async fn init_config() -> Config {
-    // Load environment variables from a .env file if present
-    dotenv::dotenv().ok();
+    // Load environment variables from a development.env file if present
+    dotenv::from_path("./development.env").ok();
     // Create a ServerConfig instance with default values or values from environment variables
     let server_config = ServerConfig {
         host: env::var("HOST").unwrap_or_else(|_| String::from("127.0.0.1")),

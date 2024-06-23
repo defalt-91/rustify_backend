@@ -8,7 +8,7 @@ services:
     volumes:
       - progressDB:/var/lib/postgresql/data
       - /var/run:/var/run
-    env_file: .env
+    env_file: development.env
     restart: always
 
   pgAdmin:
@@ -18,7 +18,7 @@ services:
       - databases
     volumes:
       - pgAdminData:/var/lib/pgadmin
-    env_file: .env
+    env_file: development.pgadmin.env
     ports:
       - "5050:5050"
 
